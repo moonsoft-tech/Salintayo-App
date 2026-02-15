@@ -1,0 +1,172 @@
+/* ===== Design tokens (Figma / SalinTayo) ===== */
+.verification-page {
+  --verification-bg: #ffffff;
+  --verification-text: #1f2937;
+  --verification-text-muted: #4b5563;
+  --verification-border: #e5e7eb;
+  --verification-primary: #0047ab;
+  --verification-input-placeholder: #9ca3af;
+  --verification-font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ===== Page container ===== */
+.verification-page {
+  min-height: 100vh;
+  background-color: var(--verification-bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 24px 32px;
+  box-sizing: border-box;
+  font-family: var(--verification-font);
+}
+
+/* ===== Header ===== */
+.verification-header {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  padding: 24px 0 20px;
+  border-bottom: 1px solid var(--verification-border);
+  margin-bottom: 24px;
+}
+
+.verification-back {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 24px;
+  font-weight: 700;
+  color: #8c95a2;
+  text-decoration: none;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.verification-back:hover {
+  color: var(--verification-text);
+}
+
+.verification-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--verification-text);
+  text-align: center;
+}
+
+/* ===== Content ===== */
+.verification-content {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.verification-instruction {
+  margin: 0 0 24px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--verification-text-muted);
+  text-align: center;
+}
+
+.verification-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ===== 4 circular inputs ===== */
+.verification-inputs {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.verification-input {
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--verification-border);
+  border-radius: 50%;
+  font-family: var(--verification-font);
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--verification-text);
+  text-align: center;
+  background: var(--verification-bg);
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.verification-input::placeholder {
+  color: var(--verification-input-placeholder);
+}
+
+.verification-input:hover {
+  border-color: #d1d5db;
+}
+
+.verification-input:focus {
+  border-color: var(--verification-primary);
+  box-shadow: 0 0 0 2px rgba(0, 71, 171, 0.2);
+}
+
+/* ===== Resend text ===== */
+.verification-resend {
+  margin: 0 0 28px;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--verification-text-muted);
+  text-align: center;
+}
+
+.verification-resend-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 500;
+  color: var(--verification-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.verification-resend-link:hover {
+  opacity: 0.85;
+}
+
+/* ===== Verify button ===== */
+.verification-button {
+  width: 100%;
+  max-width: 280px;
+  height: 56px;
+  border: none;
+  border-radius: 16px;
+  background-color: var(--verification-primary);
+  font-family: var(--verification-font);
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.verification-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.verification-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.verification-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

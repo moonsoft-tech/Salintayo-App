@@ -1,0 +1,224 @@
+/* ===== Design tokens (Figma / SalinTayo Welcome Slide 2) ===== */
+.welcome-slide2 {
+  --w2-bg: #ffffff;
+  --w2-text: #1f2937;
+  --w2-text-muted: #4b5563;
+  --w2-border: #e5e7eb;
+  --w2-cta: #7FC7A1;
+  --w2-cta-hover: #6ab88d;
+  --w2-link: #0047ab;
+  --w2-radius: 12px;
+  --w2-radius-icon: 10px;
+  --w2-check: #059669;
+  --w2-font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.welcome-slide2 {
+  min-height: 100vh;
+  background: var(--w2-bg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 20px 32px;
+  box-sizing: border-box;
+  font-family: var(--w2-font);
+}
+
+.welcome-slide2__inner {
+  width: 100%;
+  max-width: 400px;
+}
+
+.welcome-slide2__header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.welcome-slide2__logo {
+  width: 86px;
+  height: 86px;
+  margin: 0 auto 16px;
+}
+
+.welcome-slide2__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.welcome-slide2__title {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--w2-text);
+  margin: 0 0 8px;
+  line-height: 1.2;
+}
+
+.welcome-slide2__subtitle {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--w2-text-muted);
+  margin: 0;
+}
+
+.welcome-slide2__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.welcome-slide2__card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  padding: 18px 16px;
+  padding-right: 44px;
+  background: #fafafa;
+  border: 1px solid var(--w2-border);
+  border-radius: var(--w2-radius);
+  font-family: var(--w2-font);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  box-sizing: border-box;
+}
+
+.welcome-slide2__card:hover {
+  border-color: #d1d5db;
+  background: #f9fafb;
+}
+
+.welcome-slide2__card--selected {
+  border-color: var(--w2-cta);
+  background: #f0fdf4;
+  box-shadow: 0 0 0 2px rgba(127, 199, 161, 0.25);
+}
+
+.welcome-slide2__card-radio {
+  position: absolute;
+  top: 18px;
+  right: 16px;
+  font-size: 20px;
+  color: var(--w2-border);
+  line-height: 1;
+}
+
+.welcome-slide2__card--selected .welcome-slide2__card-radio {
+  color: var(--w2-cta);
+}
+
+.welcome-slide2__card-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--w2-radius-icon);
+  font-size: 22px;
+  background: #f3f4f6;
+}
+
+.welcome-slide2__card-icon--tourist {
+  background: #fef2f2;
+}
+
+.welcome-slide2__card-icon--local {
+  background: #eff6ff;
+}
+
+.welcome-slide2__card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.welcome-slide2__card-title {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--w2-text);
+  margin: 0 0 4px;
+  line-height: 1.2;
+}
+
+.welcome-slide2__card-desc {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--w2-text-muted);
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.welcome-slide2__card-features {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--w2-text);
+  line-height: 1.5;
+}
+
+.welcome-slide2__card-features li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.welcome-slide2__card-features li:last-child {
+  margin-bottom: 0;
+}
+
+.welcome-slide2__check {
+  color: var(--w2-check);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.welcome-slide2__cta {
+  display: block;
+  width: 100%;
+  padding: 16px 24px;
+  background: var(--w2-cta);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--w2-radius);
+  font-family: var(--w2-font);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  margin-bottom: 20px;
+  box-sizing: border-box;
+}
+
+.welcome-slide2__cta:hover {
+  background: var(--w2-cta-hover);
+}
+
+.welcome-slide2__cta:active {
+  transform: scale(0.99);
+}
+
+.welcome-slide2__signin {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--w2-text);
+  margin: 0;
+}
+
+.welcome-slide2__signin-link {
+  font-weight: 600;
+  color: var(--w2-link);
+  text-decoration: none;
+}
+
+.welcome-slide2__signin-link:hover {
+  text-decoration: underline;
+}

@@ -1,0 +1,287 @@
+/* ===== Design tokens (Figma / SalinTayo) ===== */
+:root {
+  --login-bg: #ffffff;
+  --login-text: #1f2937;
+  --login-text-muted: #4b5563;
+  --login-text-placeholder: #9ca3af;
+  --login-border: #e5e7eb;
+  --login-border-focus: #0047ab;
+  --login-input-bg: #f9fafb;
+  --login-primary: #0047ab;
+  --login-primary-end: #7c3aed;
+  --login-link: #0047ab;
+  --login-error: #dc2626;
+  --login-radius: 10px;
+  --login-radius-sm: 8px;
+  --login-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --login-shadow-btn: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --login-font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ===== Page container ===== */
+.login-page {
+  min-height: 100vh;
+  background-color: var(--login-bg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 20px 32px;
+  box-sizing: border-box;
+  font-family: var(--login-font);
+}
+
+.login-page__inner {
+  width: 100%;
+  max-width: 400px;
+}
+
+/* ===== Header: logo + welcome ===== */
+.login-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.login-header__logo {
+  width: 86px;
+  height: 86px;
+  margin: 0 auto 16px;
+}
+
+.login-header__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.login-header__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--login-text);
+  margin: 0 0 8px;
+  line-height: 1.3;
+}
+
+.login-header__title-brand {
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.login-header__subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--login-text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ===== Form ===== */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.login-field {
+  margin-bottom: 20px;
+}
+
+/* ===== Input wrap (icon + input + optional action) ===== */
+.login-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background-color: var(--login-input-bg);
+  border: 1px solid var(--login-border);
+  border-radius: var(--login-radius);
+  height: 56px;
+  padding: 0 16px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.login-input-wrap:focus-within {
+  border-color: var(--login-border-focus);
+  box-shadow: 0 0 0 3px rgba(0, 71, 171, 0.15);
+  outline: none;
+}
+
+.login-input-wrap__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  flex-shrink: 0;
+}
+
+.login-input-wrap__icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.login-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-family: var(--login-font);
+  font-size: 16px;
+  color: var(--login-text);
+  padding: 0;
+}
+
+.login-input::placeholder {
+  color: var(--login-text-placeholder);
+}
+
+.login-input:focus {
+  outline: none;
+}
+
+.login-input--with-action {
+  padding-right: 8px;
+}
+
+.login-input-wrap__action {
+  flex-shrink: 0;
+  font-family: var(--login-font);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--login-text-placeholder);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: -4px -8px -4px 0;
+  border-radius: var(--login-radius-sm);
+}
+
+.login-input-wrap__action:hover {
+  color: var(--login-text-muted);
+}
+
+/* ===== Forgot password ===== */
+.login-form__forgot {
+  text-align: right;
+  margin-top: -8px;
+  margin-bottom: 20px;
+}
+
+.login-form__forgot-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--login-link);
+  text-decoration: underline;
+}
+
+.login-form__forgot-link:hover {
+  opacity: 0.9;
+}
+
+/* ===== Error ===== */
+.login-form__error {
+  font-size: 14px;
+  color: var(--login-error);
+  margin: -8px 0 12px;
+  padding: 8px 12px;
+  background: rgba(220, 38, 38, 0.08);
+  border-radius: var(--login-radius-sm);
+}
+
+/* ===== Buttons ===== */
+.login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 56px;
+  border: none;
+  border-radius: var(--login-radius);
+  font-family: var(--login-font);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+  box-sizing: border-box;
+}
+
+.login-btn:active {
+  transform: scale(0.99);
+}
+
+.login-btn--primary {
+  background: linear-gradient(90deg, var(--login-primary) 0%, var(--login-primary-end) 100%);
+  color: #ffffff;
+  box-shadow: var(--login-shadow-btn);
+  margin-bottom: 24px;
+}
+
+.login-btn--primary:hover {
+  box-shadow: 0 10px 20px -5px rgba(0, 71, 171, 0.25), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+  opacity: 0.95;
+}
+
+/* ===== Divider ===== */
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background-color: var(--login-border);
+}
+
+.login-divider__text {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--login-text-placeholder);
+  white-space: nowrap;
+}
+
+/* ===== Google button ===== */
+.login-btn--google {
+  background: #ffffff;
+  color: var(--login-text);
+  border: 1px solid var(--login-border);
+  box-shadow: var(--login-shadow);
+  margin-bottom: 28px;
+}
+
+.login-btn--google:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.login-btn__google-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  object-fit: contain;
+}
+
+/* ===== Register link ===== */
+.login-form__register {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--login-text-muted);
+  margin: 0;
+}
+
+.login-form__register-link {
+  font-weight: 600;
+  color: var(--login-link);
+  text-decoration: underline;
+}
+
+.login-form__register-link:hover {
+  opacity: 0.9;
+}

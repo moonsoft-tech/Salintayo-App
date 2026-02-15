@@ -1,0 +1,143 @@
+/* ===== Design tokens (Figma / SalinTayo Welcome Slide 1) ===== */
+.welcome-slide1 {
+  --w1-bg: #fefefe;
+  --w1-bg-subtle: #fafafa;
+  --w1-text: #1f2937;
+  --w1-text-muted: #4b5563;
+  --w1-border: #e5e7eb;
+  --w1-cta-start: #059669;
+  --w1-cta-end: #1e40af;
+  --w1-radius: 12px;
+  --w1-radius-btn: 12px;
+  --w1-font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.welcome-slide1 {
+  min-height: 100vh;
+  background: var(--w1-bg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 20px 32px;
+  box-sizing: border-box;
+  font-family: var(--w1-font);
+}
+
+.welcome-slide1__inner {
+  width: 100%;
+  max-width: 400px;
+}
+
+.welcome-slide1__header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.welcome-slide1__logo {
+  width: 86px;
+  height: 86px;
+  margin: 0 auto 20px;
+}
+
+.welcome-slide1__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.welcome-slide1__title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--w1-text);
+  margin: 0 0 12px;
+  line-height: 1.3;
+}
+
+.welcome-slide1__intro {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--w1-text);
+  margin: 0;
+  text-align: left;
+}
+
+.welcome-slide1__options {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.welcome-slide1__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid var(--w1-border);
+  border-radius: var(--w1-radius);
+  font-family: var(--w1-font);
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--w1-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.welcome-slide1__card:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.welcome-slide1__card-icon {
+  font-size: 1.25em;
+  flex-shrink: 0;
+}
+
+.welcome-slide1__card-label {
+  flex: 1;
+}
+
+.welcome-slide1__tagline {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--w1-text-muted);
+  margin: 0 0 28px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.welcome-slide1__tagline-brand {
+  font-weight: 600;
+  color: var(--w1-text);
+}
+
+.welcome-slide1__cta {
+  display: block;
+  width: 100%;
+  padding: 16px 24px;
+  background: linear-gradient(90deg, var(--w1-cta-start) 0%, var(--w1-cta-end) 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--w1-radius-btn);
+  font-family: var(--w1-font);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  box-sizing: border-box;
+}
+
+.welcome-slide1__cta:hover {
+  opacity: 0.95;
+}
+
+.welcome-slide1__cta:active {
+  transform: scale(0.99);
+}
