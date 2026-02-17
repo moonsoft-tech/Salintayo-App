@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import './WelcomeSlide1.css';
 
-const imgLogo = 'https://www.figma.com/api/mcp/asset/1cc32414-606a-4f9d-b3a6-d63d911e78b7';
+const imgLogo = '/logo.png';
 
 const OPTIONS = [
   { icon: '💚', label: 'Filipino reconnecting with roots' },

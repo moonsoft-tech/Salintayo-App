@@ -6,14 +6,10 @@ import { hasSeenWelcome } from "../utils/welcomeStorage";
 import { isValidEmail } from "../utils/validation";
 import "./Register.css";
 
-const imgLogo =
-  "https://www.figma.com/api/mcp/asset/9cc5d03f-3d75-459f-9920-f6099cac42a5";
-const imgUserIcon =
-  "https://www.figma.com/api/mcp/asset/b6af645d-8c6d-4a92-95c9-d181913218c6";
-const imgEmailIcon =
-  "https://www.figma.com/api/mcp/asset/c7a27c3d-f2c5-4b1c-b4c4-941d2813623e";
-const imgLockIcon =
-  "https://www.figma.com/api/mcp/asset/06a7244d-6f87-425a-966f-40ae3788f748";
+const imgLogo = '/logo.png';
+const imgUserIcon = '/icons/user.svg';
+const imgEmailIcon = '/icons/email.svg';
+const imgLockIcon = '/icons/lock.svg';
 
 export default function Register() {
   const history = useHistory();

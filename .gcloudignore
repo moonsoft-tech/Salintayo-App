@@ -1,0 +1,7 @@
+# Used when deploying logic to Cloud Run
+node_modules
+.git
+functions/node_modules
+.env
+.env.local
+*.log

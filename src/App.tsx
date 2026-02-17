@@ -1,6 +1,7 @@
 import { Redirect, Route } from 'react-router-dom';
 import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
+import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
 import LoginPage from './pages/Login';
 import Register from './pages/Register';
@@ -50,30 +51,30 @@ const App: React.FC = () => (
   <IonApp>
     <IonReactRouter>
       <IonRouterOutlet>
-        <Route exact path="/home">
+        <ProtectedRoute exact path="/home">
           <Home />
-        </Route>
-        <Route exact path="/learn">
+        </ProtectedRoute>
+        <ProtectedRoute exact path="/learn">
           <Learn />
-        </Route>
-        <Route exact path="/quiz">
+        </ProtectedRoute>
+        <ProtectedRoute exact path="/quiz">
           <Quiz />
-        </Route>
-        <Route exact path="/chat">
+        </ProtectedRoute>
+        <ProtectedRoute exact path="/chat">
           <Chat />
-        </Route>
-        <Route exact path="/profile">
+        </ProtectedRoute>
+        <ProtectedRoute exact path="/profile">
           <Profile />
-        </Route>
+        </ProtectedRoute>
         <Route exact path="/">
           <Redirect to="/login" />
         </Route>
-        <Route exact path="/welcome">
+        <ProtectedRoute exact path="/welcome">
           <WelcomeSlide1 />
-        </Route>
-        <Route exact path="/welcome-2">
+        </ProtectedRoute>
+        <ProtectedRoute exact path="/welcome-2">
           <WelcomeSlide2 />
-        </Route>
+        </ProtectedRoute>
         <Route exact path="/login">
           <LoginPage />
         </Route>

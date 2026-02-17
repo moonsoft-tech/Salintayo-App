@@ -14,6 +14,7 @@ import {
   settingsOutline,
   chatbubbleEllipsesOutline,
 } from 'ionicons/icons';
+import { chatWithDeepSeek, type DeepSeekMessage } from '../utils/api';
 import './Chat.css';
 
 export interface ChatMessage {
@@ -23,44 +24,21 @@ export interface ChatMessage {
   timestamp: string;
 }
 
-const MOCK_MESSAGES: ChatMessage[] = [
-  {
-    id: '1',
-    role: 'ai',
-    content: "Kumusta! I'm your Filipino AI tutor. How can I help you today? ▶️ 🇵🇭",
-    timestamp: '10:30 AM',
-  },
-  {
-    id: '2',
-    role: 'user',
-    content: 'Hi! Can you translate "Good morning" to Tagalog?',
-    timestamp: '10:30 AM',
-  },
-  {
-    id: '3',
-    role: 'ai',
-    content: '"Good morning" in Tagalog is "Magandang umaga" 🌅',
-    timestamp: '10:31 AM',
-  },
-  {
-    id: '4',
-    role: 'user',
-    content: 'Perfect! How about "Thank you"?',
-    timestamp: '10:31 AM',
-  },
-  {
-    id: '5',
-    role: 'ai',
-    content: '"Thank you" is "Salamat" 🙏 You\'re learning fast!',
-    timestamp: '10:32 AM',
-  },
-];
+const SYSTEM_PROMPT = `You are a friendly Filipino language tutor for the SalinTayo app. Help users translate, learn, and converse in Filipino/Tagalog. Be warm, encouraging, and concise. Use appropriate emojis sparingly.`;
+
+const formatTime = () =>
+  new Date().toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
 
 const ChatPage: React.FC = () => {
   const location = useLocation();
   const isChat = location.pathname === '/chat';
-  const [messages, setMessages] = useState<ChatMessage[]>(MOCK_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -72,20 +50,53 @@ const ChatPage: React.FC = () => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
-    const newMessage: ChatMessage = {
+  const handleSend = async () => {
+    const text = inputValue.trim();
+    if (!text || isLoading) return;
+
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content: inputValue.trim(),
-      timestamp: new Date().toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      }),
+      content: text,
+      timestamp: formatTime(),
     };
-    setMessages((prev) => [...prev, newMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInputValue('');
+    setIsLoading(true);
+
+    try {
+      const apiMessages: DeepSeekMessage[] = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...messages
+          .filter((m) => m.role === 'user' || m.role === 'ai')
+          .map((m) => ({
+            role: (m.role === 'ai' ? 'assistant' : 'user') as 'user' | 'assistant',
+            content: m.content,
+          })),
+        { role: 'user', content: text },
+      ];
+
+      const reply = await chatWithDeepSeek(apiMessages);
+
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: reply || 'Sorry, I could not generate a response. Please try again.',
+        timestamp: formatTime(),
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : 'Failed to get response';
+      const fallbackMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'ai',
+        content: `Sorry, something went wrong: ${errMsg}. Please check your connection and try again.`,
+        timestamp: formatTime(),
+      };
+      setMessages((prev) => [...prev, fallbackMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -129,6 +140,24 @@ const ChatPage: React.FC = () => {
           </header>
 
           <section className="chat-messages" aria-label="Chat conversation">
+            {messages.length === 0 && (
+              <div className="chat-empty-state">
+                <p>Kumusta! I&apos;m your Filipino AI tutor powered by DeepSeek-V3.</p>
+                <p>Type a message below to translate, learn, or converse in Filipino.</p>
+              </div>
+            )}
+            {isLoading && (
+              <div className="chat-message chat-message--ai chat-message--loading" data-role="ai">
+                <div className="chat-message__avatar">
+                  <IonIcon icon={chatbubbleEllipsesOutline} aria-hidden />
+                </div>
+                <div className="chat-message__bubble-wrap">
+                  <div className="chat-message__bubble">
+                    <p className="chat-message__text chat-message__typing">Thinking...</p>
+                  </div>
+                </div>
+              </div>
+            )}
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -191,6 +220,7 @@ const ChatPage: React.FC = () => {
               type="button"
               className="chat-input__send"
               onClick={handleSend}
+              disabled={isLoading}
               aria-label="Send message"
             >
               <IonIcon icon={send} aria-hidden />

@@ -160,6 +160,32 @@
   margin-bottom: 20px;
 }
 
+.chat-empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--chat-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.chat-empty-state p {
+  margin: 0 0 8px;
+}
+
+.chat-empty-state p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-message--loading .chat-message__typing {
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.chat-input__send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .chat-message {
   display: flex;
   gap: 10px;

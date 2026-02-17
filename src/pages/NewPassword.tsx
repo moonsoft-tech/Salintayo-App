@@ -3,7 +3,7 @@ import { useHistory } from 'react-router-dom';
 import './NewPassword.css';
 
 const imgPasswordIcon =
-  'https://www.figma.com/api/mcp/asset/707532e6-475e-4c07-958c-24ce952e4dab';
+  '/icons/password.svg';
 
 export default function NewPassword() {
   const history = useHistory();

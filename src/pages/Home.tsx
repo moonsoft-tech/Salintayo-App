@@ -10,8 +10,7 @@ import {
 } from 'ionicons/icons';
 import './Home.css';
 
-/* Figma / SalinTayo assets */
-const imgLogo = 'https://www.figma.com/api/mcp/asset/1cc32414-606a-4f9d-b3a6-d63d911e78b7';
+const imgLogo = '/logo.png';
 
 const HomePage: React.FC = () => {
   const location = useLocation();

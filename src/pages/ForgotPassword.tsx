@@ -5,7 +5,7 @@ import { firebaseAuth } from '../firebase';
 import { isValidEmail } from '../utils/validation';
 import './ForgotPassword.css';
 
-const imgEmailIcon = "https://www.figma.com/api/mcp/asset/c7a27c3d-f2c5-4b1c-b4c4-941d2813623e";
+const imgEmailIcon = '/icons/email.svg';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');

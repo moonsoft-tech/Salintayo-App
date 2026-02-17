@@ -6,10 +6,10 @@ import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { isValidEmail } from '../utils/validation';
 import './Login.css';
 
-const imgLogo = "https://www.figma.com/api/mcp/asset/1cc32414-606a-4f9d-b3a6-d63d911e78b7";
-const imgEmailIcon = "https://www.figma.com/api/mcp/asset/c7a27c3d-f2c5-4b1c-b4c4-941d2813623e";
-const imgPasswordIcon = "https://www.figma.com/api/mcp/asset/707532e6-475e-4c07-958c-24ce952e4dab";
-const imgGoogleIcon = "https://www.figma.com/api/mcp/asset/0440cf5c-013f-4f90-aa1f-96cae2770470";
+const imgLogo = '/logo.png';
+const imgEmailIcon = '/icons/email.svg';
+const imgPasswordIcon = '/icons/password.svg';
+const imgGoogleIcon = '/icons/google.svg';
 
 export default function LoginPage() {
   const history = useHistory();
