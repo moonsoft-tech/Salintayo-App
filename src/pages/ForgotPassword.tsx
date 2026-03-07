@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { firebaseAuth } from '../firebase';
+import { Link, useHistory } from 'react-router-dom';
 import { isValidEmail } from '../utils/validation';
+import { sendPasswordResetCode } from '../utils/api';
 import './ForgotPassword.css';
 
 const imgEmailIcon = '/icons/email.svg';
 
 export default function ForgotPassword() {
+  const history = useHistory();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,15 +26,13 @@ export default function ForgotPassword() {
     }
     setLoading(true);
     try {
-      await sendPasswordResetEmail(firebaseAuth, email);
+      await sendPasswordResetCode(email.trim().toLowerCase());
       setSent(true);
-    } catch (err: unknown) {
-      const code = err && typeof err === 'object' && 'code' in err ? (err as { code: string }).code : '';
-      setError(
-        code === 'auth/user-not-found'
-          ? 'No account found for this email.'
-          : 'Failed to send reset email. Please try again.'
-      );
+      setTimeout(() => {
+        history.push('/verification', { email: email.trim().toLowerCase(), context: 'password-reset' });
+      }, 1500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -82,7 +80,7 @@ export default function ForgotPassword() {
             )}
             {sent && (
               <p className="forgot-password-form__success" role="status">
-                Check your email for a link to reset your password.
+                Check your email for a 6-digit code to reset your password.
               </p>
             )}
 

@@ -4,6 +4,7 @@ import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { firebaseAuth } from "../firebase";
 import { hasSeenWelcome } from "../utils/welcomeStorage";
 import { isValidEmail } from "../utils/validation";
+import { markUserRegistered } from "../utils/api";
 import "./Register.css";
 
 const imgLogo = '/logo.png';
@@ -58,6 +59,11 @@ export default function Register() {
     try {
       const { user } = await createUserWithEmailAndPassword(firebaseAuth, email, password);
       await updateProfile(user, { displayName: fullName.trim() });
+      try {
+        await markUserRegistered();
+      } catch {
+        // Non-blocking: user is registered; claim may fail if functions not deployed
+      }
       history.push(hasSeenWelcome(user.uid) ? "/home" : "/welcome");
     } catch (err: unknown) {
       const code = err && typeof err === "object" && "code" in err ? (err as { code: string }).code : "";

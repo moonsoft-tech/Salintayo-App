@@ -1,20 +1,34 @@
 import React, { useState } from 'react';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useLocation } from 'react-router-dom';
+import { resetPasswordWithCode } from '../utils/api';
 import './NewPassword.css';
 
-const imgPasswordIcon =
-  '/icons/password.svg';
+const imgPasswordIcon = '/icons/password.svg';
+
+interface LocationState {
+  email?: string;
+  code?: string;
+}
 
 export default function NewPassword() {
   const history = useHistory();
+  const location = useLocation<LocationState>();
+  const { email, code } = location.state || {};
+  const isPasswordReset = Boolean(email && code);
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password || !confirmPassword) {
       setError('Please fill in all fields.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
       return;
     }
     if (password !== confirmPassword) {
@@ -22,8 +36,19 @@ export default function NewPassword() {
       return;
     }
     setError('');
-    // TODO: call API to set new password
-    history.push('/login');
+    setLoading(true);
+    try {
+      if (isPasswordReset) {
+        await resetPasswordWithCode(email!, code!, password);
+        history.push('/login', { message: 'Password updated. You can now sign in.' });
+      } else {
+        history.push('/login');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to reset password. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -80,8 +105,8 @@ export default function NewPassword() {
             </p>
           )}
 
-          <button type="submit" className="new-password-btn">
-            Submit
+          <button type="submit" className="new-password-btn" disabled={loading}>
+            {loading ? 'Updating…' : 'Submit'}
           </button>
         </form>
       </div>
