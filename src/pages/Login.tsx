@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Link, useHistory } from 'react-router-dom';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
+import { Link, useHistory, useLocation } from 'react-router-dom';
+import { signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, GoogleAuthProvider } from 'firebase/auth';
 import { firebaseAuth } from '../firebase';
+import { useAuth } from '../contexts/AuthContext';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { isValidEmail } from '../utils/validation';
 import './Login.css';
@@ -13,11 +14,21 @@ const imgGoogleIcon = '/icons/google.svg';
 
 export default function LoginPage() {
   const history = useHistory();
+  const location = useLocation<{ message?: string }>();
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Redirect when user lands back from Google sign-in redirect (only when user becomes truthy)
+  useEffect(() => {
+    if (user) {
+      history.replace(hasSeenWelcome(user.uid) ? '/home' : '/welcome');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only redirect when user changes; history is stable
+  }, [user]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +44,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { user } = await signInWithEmailAndPassword(firebaseAuth, email, password);
-      history.push(hasSeenWelcome(user.uid) ? '/home' : '/welcome');
+      history.replace(hasSeenWelcome(user.uid) ? '/home' : '/welcome');
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'code' in err
         ? (err as { code: string }).code === 'auth/invalid-credential'
@@ -51,23 +62,35 @@ export default function LoginPage() {
   const handleGoogleLogin = async () => {
     setError('');
     setLoading(true);
+    let isRedirecting = false;
     try {
       const provider = new GoogleAuthProvider();
-      const { user } = await signInWithPopup(firebaseAuth, provider);
-      history.push(hasSeenWelcome(user.uid) ? '/home' : '/welcome');
+      const { user: u } = await signInWithPopup(firebaseAuth, provider);
+      history.replace(hasSeenWelcome(u.uid) ? '/home' : '/welcome');
     } catch (err: unknown) {
-      const message = err && typeof err === 'object' && 'code' in err
-        ? (err as { code: string }).code === 'auth/popup-closed-by-user'
+      const code = err && typeof err === 'object' && 'code' in err ? (err as { code: string }).code : '';
+      if (code === 'auth/popup-blocked') {
+        isRedirecting = true;
+        setError('Redirecting to Google…');
+        signInWithRedirect(firebaseAuth, new GoogleAuthProvider()).catch(() => {
+          setError('Redirect failed. Please allow popups or try again.');
+          setLoading(false);
+        });
+        return;
+      }
+      const message =
+        code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request'
           ? 'Sign-in was cancelled.'
-          : (err as { code: string }).code === 'auth/cancelled-popup-request'
-            ? 'Sign-in was cancelled.'
-            : (err as { code: string }).code === 'auth/account-exists-with-different-credential'
-              ? 'An account already exists with the same email but different sign-in method. Try signing in with email/password.'
-              : 'Google sign-in failed. Please try again.'
-        : 'Google sign-in failed. Please try again.';
+          : code === 'auth/account-exists-with-different-credential'
+            ? 'An account already exists with the same email but different sign-in method. Try signing in with email/password.'
+            : code === 'auth/unauthorized-domain'
+              ? 'This app is not authorized for Google sign-in from this domain. Add this domain in Firebase Console → Authentication → Settings → Authorized domains.'
+              : code === 'auth/operation-not-allowed'
+                ? 'Google sign-in is not enabled. In Firebase Console → Authentication → Sign-in method, enable Google.'
+                : 'Google sign-in failed. Please try again.';
       setError(message);
     } finally {
-      setLoading(false);
+      if (!isRedirecting) setLoading(false);
     }
   };
 
@@ -136,6 +159,9 @@ export default function LoginPage() {
             <Link to="/forgot-password" className="login-form__forgot-link">Forgot Password?</Link>
           </div>
 
+          {location.state?.message && (
+            <p className="login-form__success" role="status">{location.state.message}</p>
+          )}
           {error && (
             <p className="login-form__error" role="alert">{error}</p>
           )}

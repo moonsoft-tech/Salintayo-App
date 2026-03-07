@@ -189,6 +189,16 @@
   border-radius: var(--login-radius-sm);
 }
 
+/* ===== Success (e.g. after password reset) ===== */
+.login-form__success {
+  font-size: 14px;
+  color: #059669;
+  margin: -8px 0 12px;
+  padding: 8px 12px;
+  background: rgba(5, 150, 105, 0.1);
+  border-radius: var(--login-radius-sm);
+}
+
 /* ===== Buttons ===== */
 .login-btn {
   display: flex;

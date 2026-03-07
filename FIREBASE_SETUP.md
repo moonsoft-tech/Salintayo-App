@@ -59,12 +59,37 @@ npm run dev
 ```
 
 - **Login** and **Register** use Firebase Authentication (email/password).
-- **Forgot password** sends a reset email via Firebase.
+- **Forgot password** uses a 6-digit code sent to the user's email (Gmail). See below for SMTP setup.
 - Auth state is shared via `AuthContext`; use `useAuth()` in any component to read `user` and `loading`.
+
+## Password reset (code-based flow)
+
+Forgot password sends a 6-digit code to the user's email instead of a link. Requires:
+
+- **Firestore** enabled in your Firebase project (Build → Firestore Database → Create database).
+- **SMTP configuration** (Gmail recommended):
+
+1. **Gmail App Password** (recommended for Gmail):
+   - Enable 2-Step Verification on your Google account.
+   - Go to [Google Account → Security → App passwords](https://myaccount.google.com/apppasswords).
+   - Generate an app password for "Mail" and copy it.
+
+2. **Configure Firebase Functions**:
+   ```bash
+   firebase functions:config:set smtp.user="your@gmail.com" smtp.pass="xxxx xxxx xxxx xxxx"
+   ```
+
+3. **Deploy the functions**:
+   ```bash
+   cd functions && npm run build && firebase deploy --only functions
+   ```
+
+4. Ensure `VITE_FUNCTIONS_URL` is set in `.env` (e.g. `https://us-central1-YOUR_PROJECT.cloudfunctions.net`).
 
 ## Optional: Google sign-in
 
 To enable “Continue with Google” on the login page:
 
 1. In Firebase Console → **Authentication** → **Sign-in method**, enable **Google** and set support email.
-2. Install and use `signInWithPopup` (or `signInWithRedirect`) with `GoogleAuthProvider` from `firebase/auth` in `Login.tsx`.
+2. Add your app's URL to **Authorized domains**: Authentication → **Settings** → **Authorized domains**. Include `localhost` for dev and your production domain when you deploy.
+3. The app uses `signInWithPopup` and falls back to `signInWithRedirect` if the popup is blocked.

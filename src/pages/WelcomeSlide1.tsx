@@ -21,7 +21,8 @@ export default function WelcomeSlide1() {
     if (hasSeenWelcome(user?.uid)) {
       history.replace('/home');
     }
-  }, [history, user?.uid]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only redirect when user changes
+  }, [user?.uid]);
 
   return (
     <div className="welcome-slide1">

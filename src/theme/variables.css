@@ -1,2 +1,11 @@
 /* For information on how to create your own theme, please refer to:
 http://ionicframework.com/docs/theming/ */
+
+/* Prevent black screen: ensure root and body have a visible background */
+html, body, #root {
+  background-color: #ffffff;
+  min-height: 100%;
+}
+body.dark, .ion-palette-dark {
+  background-color: #121212;
+}

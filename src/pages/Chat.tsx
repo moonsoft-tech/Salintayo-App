@@ -86,6 +86,7 @@ const ChatPage: React.FC = () => {
       };
       setMessages((prev) => [...prev, aiMessage]);
     } catch (e) {
+      console.error('[Chat] AI request failed:', e);
       const errMsg = e instanceof Error ? e.message : 'Failed to get response';
       const fallbackMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -146,18 +147,6 @@ const ChatPage: React.FC = () => {
                 <p>Type a message below to translate, learn, or converse in Filipino.</p>
               </div>
             )}
-            {isLoading && (
-              <div className="chat-message chat-message--ai chat-message--loading" data-role="ai">
-                <div className="chat-message__avatar">
-                  <IonIcon icon={chatbubbleEllipsesOutline} aria-hidden />
-                </div>
-                <div className="chat-message__bubble-wrap">
-                  <div className="chat-message__bubble">
-                    <p className="chat-message__text chat-message__typing">Thinking...</p>
-                  </div>
-                </div>
-              </div>
-            )}
             {messages.map((msg) => (
               <div
                 key={msg.id}
@@ -188,6 +177,18 @@ const ChatPage: React.FC = () => {
                 </div>
               </div>
             ))}
+            {isLoading && (
+              <div className="chat-message chat-message--ai chat-message--loading" data-role="ai">
+                <div className="chat-message__avatar">
+                  <IonIcon icon={chatbubbleEllipsesOutline} aria-hidden />
+                </div>
+                <div className="chat-message__bubble-wrap">
+                  <div className="chat-message__bubble">
+                    <p className="chat-message__text chat-message__typing">Thinking...</p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} aria-hidden />
           </section>
 

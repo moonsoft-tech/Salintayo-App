@@ -1,11 +1,37 @@
 import { firebaseAuth } from '../firebase';
 
 /**
- * Base URL for API (Firebase Cloud Functions or Vercel).
- * - Firebase: https://us-central1-YOUR_PROJECT.cloudfunctions.net
- * - Vercel: leave empty to use same-origin /api/chatCompletion
+ * Base URL for Firebase Cloud Functions.
+ * Set VITE_FUNCTIONS_URL in .env (e.g. https://us-central1-YOUR_PROJECT.cloudfunctions.net)
+ * For local emulator: http://127.0.0.1:5001/YOUR_PROJECT/us-central1
  */
 const FUNCTIONS_BASE = import.meta.env.VITE_FUNCTIONS_URL || '';
+
+/**
+ * Call a public Cloud Function (no auth required).
+ */
+async function callPublicApi<T = unknown>(
+  functionName: string,
+  options: Omit<RequestInit, 'body'> & { body?: unknown } = {}
+): Promise<T> {
+  if (!FUNCTIONS_BASE) {
+    throw new Error('VITE_FUNCTIONS_URL is not set. Add it to .env');
+  }
+  const url = `${FUNCTIONS_BASE}/${functionName}`;
+  const { body, ...rest } = options;
+  const resolvedBody = body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body);
+  const res = await fetch(url, {
+    ...rest,
+    method: rest.method || 'POST',
+    headers: { 'Content-Type': 'application/json', ...(rest.headers as Record<string, string>) },
+    body: resolvedBody,
+  });
+  const data = await res.json().catch(() => ({ error: res.statusText }));
+  if (!res.ok) {
+    throw new Error(data.message || data.error || 'Request failed');
+  }
+  return data as T;
+}
 
 /**
  * Get the current user's ID token for authenticated requests.
@@ -31,15 +57,30 @@ export async function callProtectedApi<T = unknown>(
     throw new Error('Not authenticated');
   }
 
-  const url = FUNCTIONS_BASE ? `${FUNCTIONS_BASE}/${functionName}` : `/${functionName}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+  if (!FUNCTIONS_BASE) {
+    throw new Error('VITE_FUNCTIONS_URL is not set. Add it to .env for the Chat API.');
+  }
+
+  const url = `${FUNCTIONS_BASE}/${functionName}`;
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === 'Failed to fetch' || msg.includes('Load failed') || msg.includes('NetworkError')) {
+      throw new Error(
+        'Cannot reach the server (network or CORS). Make sure you ran "firebase deploy --only functions" and that chatCompletion is deployed.'
+      );
+    }
+    throw e;
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -58,22 +99,81 @@ export async function fetchMe() {
   });
 }
 
-/** DeepSeek message format (OpenAI-compatible). */
+/** Chat message format (OpenAI/OpenRouter compatible). */
 export interface DeepSeekMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
 }
 
+/** Mark the current user as registered (app sign-up). Called after successful registration. */
+export async function markUserRegistered(): Promise<void> {
+  await callProtectedApi('markUserRegistered', { method: 'POST', body: JSON.stringify({}) });
+}
+
+/** Request a 6-digit password reset code to be sent to the given email. */
+export async function sendPasswordResetCode(email: string): Promise<void> {
+  await callPublicApi('sendPasswordResetCode', { method: 'POST', body: { email } });
+}
+
+/** Verify the password reset code. Throws if invalid or expired. */
+export async function verifyPasswordResetCode(email: string, code: string): Promise<void> {
+  await callPublicApi('verifyPasswordResetCode', { method: 'POST', body: { email, code } });
+}
+
+/** Reset password using the verified code. */
+export async function resetPasswordWithCode(
+  email: string,
+  code: string,
+  newPassword: string
+): Promise<void> {
+  await callPublicApi('resetPasswordWithCode', {
+    method: 'POST',
+    body: { email, code, newPassword },
+  });
+}
+
+const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '';
+const OPENROUTER_MODEL = 'deepseek/deepseek-chat';
+
 /**
- * Chat with DeepSeek-V3. Sends messages to Cloud Function which proxies to DeepSeek API.
+ * Chat with DeepSeek via OpenRouter (client-side). No Firebase Blaze or Cloud Functions needed.
+ * Get an API key at https://openrouter.ai/keys and optionally restrict it by origin.
  * Returns the assistant's reply content.
  */
 export async function chatWithDeepSeek(messages: DeepSeekMessage[]): Promise<string> {
-  // Vercel: /api/chatCompletion (same origin). Firebase: FUNCTIONS_BASE/chatCompletion
-  const chatPath = FUNCTIONS_BASE ? 'chatCompletion' : 'api/chatCompletion';
-  const result = await callProtectedApi<{ content: string }>(chatPath, {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error(
+      'VITE_OPENROUTER_API_KEY is not set. Add it to .env (get a key at https://openrouter.ai/keys).'
+    );
+  }
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    body: JSON.stringify({ messages }),
+    headers: {
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : '',
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      messages,
+      max_tokens: 2048,
+      temperature: 0.7,
+    }),
   });
-  return result.content ?? '';
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: { message: res.statusText } }));
+    const msg = err?.error?.message ?? err?.message ?? res.statusText;
+    throw new Error(msg || 'OpenRouter request failed');
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+  if (data.error) {
+    throw new Error(data.error.message || 'OpenRouter error');
+  }
+  return data.choices?.[0]?.message?.content ?? '';
 }

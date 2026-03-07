@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { Link, useHistory, useLocation } from 'react-router-dom';
 import { IonContent, IonIcon, IonPage } from '@ionic/react';
 import {
   personCircleOutline,
@@ -16,10 +16,33 @@ import {
   chatbubbleOutline,
 } from 'ionicons/icons';
 import './Profile.css';
+import NotifModal from './NotifModal';
+import EditProfileModal from './EditProfileModal';
+import LanguageModal from './LanguageModal';
+import HelpModal from './HelpModal';
+import LogoutModal from './LogoutModal';
+import { useAuth } from '../contexts/AuthContext';
+import { signOut } from 'firebase/auth';
+import { firebaseAuth } from '../firebase';
 
 const ProfilePage: React.FC = () => {
+  const history = useHistory();
   const location = useLocation();
   const isProfile = location.pathname === '/profile';
+  const { user } = useAuth();
+
+  const [showNotifModal, setShowNotifModal] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const displayName = useMemo(() => {
+    const name = user?.displayName?.trim();
+    if (name) return name;
+    if (user?.email) return user.email.split('@')[0];
+    return 'Juan Dela Cruz';
+  }, [user]);
 
   return (
     <IonPage>
@@ -34,12 +57,13 @@ const ProfilePage: React.FC = () => {
                 type="button"
                 className="profile-avatar-edit"
                 aria-label="Edit profile photo"
+                onClick={() => setShowEditProfileModal(true)}
               >
                 <IonIcon icon={createOutline} />
               </button>
             </div>
             <h1 className="profile-name">
-              Juan Dela Cruz
+              {displayName}
               <IonIcon icon={flagOutline} className="profile-name-flag" aria-hidden />
             </h1>
             <p className="profile-learning">Learning: Cebuano | Level: Intermediate</p>
@@ -91,7 +115,7 @@ const ProfilePage: React.FC = () => {
                 🌴 Cebuano
               </span>
             </div>
-            <button type="button" className="profile-btn profile-btn--dialect">
+            <button type="button" className="profile-btn profile-btn--dialect" onClick={() => setShowLanguageModal(true)}>
               Change Dialect
             </button>
           </section>
@@ -104,34 +128,63 @@ const ProfilePage: React.FC = () => {
             </div>
             <ul className="profile-settings-list">
               <li>
-                <a href="#edit-profile" className="profile-settings-item">
+                <button type="button" className="profile-settings-item" onClick={() => setShowEditProfileModal(true)}>
                   <span>Edit Profile</span>
                   <IonIcon icon={chevronForwardOutline} className="profile-settings-chevron" />
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#language" className="profile-settings-item">
+                <button type="button" className="profile-settings-item" onClick={() => setShowLanguageModal(true)}>
                   <span>Language & Region</span>
                   <IonIcon icon={chevronForwardOutline} className="profile-settings-chevron" />
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#help" className="profile-settings-item">
+                <button type="button" className="profile-settings-item" onClick={() => setShowHelpModal(true)}>
                   <span>Help Center</span>
                   <IonIcon icon={chevronForwardOutline} className="profile-settings-chevron" />
-                </a>
+                </button>
               </li>
               <li>
-                <a href="#logout" className="profile-settings-item profile-settings-item--logout">
+                <button type="button" className="profile-settings-item" onClick={() => setShowNotifModal(true)}>
+                  <span>Notification Preferences</span>
+                  <IonIcon icon={chevronForwardOutline} className="profile-settings-chevron" />
+                </button>
+              </li>
+              <li>
+                <button type="button" className="profile-settings-item profile-settings-item--logout" onClick={() => setShowLogoutModal(true)}>
                   <span>Logout</span>
                   <IonIcon icon={logOutOutline} className="profile-settings-chevron" />
-                </a>
+                </button>
               </li>
             </ul>
           </section>
 
           <div className="profile-spacer" aria-hidden />
         </div>
+
+        {/* Modals */}
+        <NotifModal isOpen={showNotifModal} onClose={() => setShowNotifModal(false)} />
+        <EditProfileModal
+          isOpen={showEditProfileModal}
+          onClose={() => setShowEditProfileModal(false)}
+          onSave={(data) => {
+            // Keep UI responsive even if auth refresh is delayed
+            // eslint-disable-next-line no-console
+            console.log('Profile saved:', data);
+          }}
+        />
+        <LanguageModal isOpen={showLanguageModal} onClose={() => setShowLanguageModal(false)} />
+        <HelpModal isOpen={showHelpModal} onClose={() => setShowHelpModal(false)} />
+        <LogoutModal
+          isOpen={showLogoutModal}
+          onClose={() => setShowLogoutModal(false)}
+          onConfirm={async () => {
+            await signOut(firebaseAuth);
+            setShowLogoutModal(false);
+            history.replace('/login');
+          }}
+        />
 
         <footer className="profile-footer">
           <nav className="profile-nav" aria-label="Main">
