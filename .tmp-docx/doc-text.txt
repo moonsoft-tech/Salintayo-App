@@ -1,0 +1,356 @@
+Data and Process Modeling
+A. Object Modeling
+Figure 6  
+Use Case Diagram (User/Tourist)
+Figure 6 illustrates the actual User/Tourist interactions in your app. The user logs in with Google via Firebase Authentication, passes through the welcome slides, and arrives at the home dashboard. From there the user can access learning content, take quizzes, and use the AI chat assistant. The “Login” and “Welcome” functions provide secure access and route the user to the correct app sections. The “Chat with AI” feature supports intelligent assistance, including translation, voice input, and image attachment processing. The “Learn” and “Quiz” functions deliver language learning content and progress tracking. The “Profile” and “Notification” features let the user manage personal settings, language preferences, and app alerts.
+Figure 7  
+Use Case Diagram (Admin)
+Figure 7 shows the admin interactions found in the 
+salintayo
+-admin portal. The admin signs in, opens the dashboard, and navigates between Users, Chats, Dialects, AI Training, Settings, and Activity Log. The “Users” function allows viewing and managing learner profiles. The “Chats” function allows reviewing synced chat sessions from the learner app. The “Dialects” function allows managing language region data, while the “AI Training” function supports reviewing and correcting model phrases. The “Settings” and “Activity Log” functions support configuration and audit of admin actions.
+Figure 8
+Sequence Diagram (Chat Flow)
+Figure 8 illustrates the sequence of interactions when a user sends a message in the chat. The user enters text or voice input, the frontend application captures and formats the request, sends it to 
+OpenRouter
+ API via the backend, which calls DeepSeek AI model, receives the translation or response, and returns it to the user interface for display. This sequence shows the timing and order of operations to ensure smooth user experience.
+B. Data Design
+Figure 9
+Entity Relationship Diagram (ERD)
+Figure 9 illustrates the structured design of the 
+SalinTayo
+ language-learning application composed of interconnected entities that support user interaction, language content management, and chat monitoring. The core of the system revolves around the users table, 
+which stores user information and connects to multiple modules such as 
+chatSessions
+, notifications, and dialect preferences. Each user can have multiple chat sessions, receive notifications, and maintain learning progress and streak history, establishing one-to-many relationships across these entities.
+The dialects table serves as another central component, containing detailed information about Philippine languages and regional variations. Each dialect can be associated with multiple users who select it as their preferred learning language. The dialects table includes language codes, native names, speaker counts, regions, and cultural metadata to support comprehensive language learning.
+The 
+chatSessions
+ table captures user conversations with the AI assistant, including message history, timestamps, and the dialect being used. Each chat session belongs to a single user and records interaction history for user reference and potential AI training. The notifications table ensures communication by delivering updates and alerts related to learning reminders, streak alerts, level-up messages, and community notifications.
+On the administrative side, additional tables such as 
+admin_user
+, 
+activityLog
+, and 
+ai_training
+ are used to manage system operations. The 
+admin_user
+ table stores administrator account information linked to users through a foreign key relationship. The 
+activityLog
+ table maintains an audit trail of admin actions including user management, dialect updates, and settings changes. The 
+ai_training
+ table stores phrases from user interactions where the AI model performed 
+suboptimally
+, along with corrections and training status, supporting continuous improvement of the language model. These entities together ensure efficient system management and comprehensive tracking of all system operations.
+Data Dictionary
+The data dictionary covers the fields, lengths, types, and descriptions of data used in the system. It facilitates the development of the system database and supports readers in comprehending the connections among the information in the database.
+Table 4
+Users Table
+Field Name
+Data Type
+Length
+Description
+id (PK)
+varchar
+50
+Unique user identifier from Firebase Auth
+email
+varchar
+255
+User's email address
+displayName
+varchar
+100
+User's display name from profile
+photoURL
+text
+-
+User's profile image URL or base64
+nationality
+varchar
+100
+User's nationality
+dialectLanguage
+varchar
+50
+Preferred language code (fil, 
+ceb
+, 
+ilo
+, etc.)
+progress
+float
+-
+Learning progress percentage (0-100)
+loginStreak
+int
+-
+Current consecutive login days
+loginActivityDates
+text
+-
+Array of login date strings
+createdAt
+datetime
+-
+Account creation date
+updatedAt
+datetime
+-
+Last profile update date
+Table 4 structure allows for comprehensive user information management while maintaining flexibility for storing authentication, profile, and learning progress data. It supports Firebase Authentication integration and enables tracking of user engagement through streaks and activity dates while accommodating language preference personalization.
+Table 5
+Dialects Table
+Field Name
+Data Type
+Length
+Description
+code (PK)
+varchar
+10
+Unique dialect code (fil, 
+ceb
+, 
+ilo
+, 
+hil
+, etc.)
+name
+varchar
+100
+English name of the dialect
+nativeName
+varchar
+100
+Native name in the dialect language
+region
+varchar
+100
+Geographic region or province
+speakers
+varchar
+50
+Approximate number of speakers
+image
+text
+-
+Region/dialect image URL
+difficulty
+varchar
+50
+Learning difficulty level
+highlights
+text
+-
+Key features or highlights
+createdAt
+datetime
+-
+Record creation date
+updatedAt
+datetime
+-
+Last update date
+Table 5 structure allows for comprehensive management of Philippine dialect information while maintaining flexibility for cultural and linguistic content. It stores language codes, native names, regional data, and speaker information to support personalized language learning experiences and cultural context.
+Table 6
+ChatSessions
+ Table
+Field Name
+Data Type
+Length
+Description
+id (PK)
+varchar
+50
+Unique chat session identifier
+userId
+ (FK)
+varchar
+50
+Reference to the user who initiated the chat
+dialectCode
+varchar
+10
+Dialect used in this chat session
+messages
+text
+-
+Array of message objects with role, content, and timestamps
+type
+varchar
+50
+Message type (text, voice, image)
+isAutoTranslation
+boolean
+1
+Flag for auto-translation requests
+createdAt
+datetime
+-
+Session creation date
+updatedAt
+datetime
+-
+Last message timestamp
+Table 6 structure allows for efficient management of user-AI chat interactions while maintaining flexibility in capturing conversation history, message types, and language preferences. It stores detailed chat content, enabling users to review past conversations and supporting AI model improvements through training data collection.
+Table 7
+Notifications Table
+Field Name
+Data Type
+Length
+Description
+id (PK)
+varchar
+50
+Unique notification identifier
+userId
+ (FK)
+varchar
+50
+Reference to the user receiving the notification
+type
+varchar
+50
+Notification type (
+daily_reminder
+, 
+streak_alert
+, 
+lesson_ready
+, etc.)
+title
+varchar
+150
+Notification title
+message
+text
+-
+Notification message content
+isRead
+boolean
+1
+Read/unread status
+createdAt
+datetime
+-
+Notification creation date
+Table 7 structure allows for efficient management of system-generated alerts and updates while maintaining flexibility for different notification types and preferences. It tracks notification delivery, read status, and timestamps to ensure users are informed about learning reminders, achievements, and system updates.
+Table 8
+Admin User Table
+Field Name
+Data Type
+Length
+Description
+id (PK)
+varchar
+50
+Unique admin identifier
+userId
+ (FK)
+varchar
+50
+Reference to associated user account
+role
+varchar
+50
+Admin role (
+superadmin
+, moderator, etc.)
+status
+varchar
+50
+Account status (active, inactive)
+createdAt
+datetime
+-
+Admin account creation date
+updatedAt
+datetime
+-
+Last update date
+Table 8 structure allows for structured management of administrative accounts while maintaining security and role-based access control. It links admin functions to user accounts and tracks administrative status for proper system governance.
+Table 9
+Activity Log Table
+Field Name
+Data Type
+Length
+Description
+id (PK)
+varchar
+50
+Unique activity log entry identifier
+adminId
+ (FK)
+varchar
+50
+Reference to the admin who performed the action
+action
+varchar
+150
+Type of action performed
+target
+varchar
+150
+Target of the action (user, dialect, etc.)
+targetId
+varchar
+50
+ID of the targeted resource
+details
+text
+-
+Additional details about the action
+timestamp
+datetime
+-
+When the action occurred
+Table 9 structure maintains a comprehensive audit trail of administrative activities for security and accountability. It records all significant admin actions including user 
+management, content updates, and settings changes to support system monitoring and compliance tracking.
+Table 10
+AI Training Table
+Field Name
+Data Type
+Length
+Description
+id (PK)
+varchar
+50
+Unique training phrase identifier
+phrase
+text
+-
+The original phrase from user input
+sourceDialect
+varchar
+10
+Source dialect/language code
+targetDialect
+varchar
+10
+Target dialect/language code
+expectedOutput
+text
+-
+Correct or improved output
+actualOutput
+text
+-
+What the model originally produced
+status
+varchar
+50
+Training status (pending, resolved, trained)
+correction
+text
+-
+Admin notes and correction guidance
+createdAt
+datetime
+-
+Entry creation date
+updatedAt
+datetime
+-
+Last update date
+Table 10 structure enables effective monitoring and improvement of AI model performance while maintaining flexibility for capturing misrecognitions and corrections. It stores phrases where the model performed 
+suboptimally
+ along with corrections and training notes to support continuous enhancement of translation and language assistance capabilities.

@@ -4,9 +4,8 @@
   --w2-text: #1f2937;
   --w2-text-muted: #4b5563;
   --w2-border: #e5e7eb;
-  --w2-cta: #7FC7A1;
+  --w2-cta: #238450;
   --w2-cta-hover: #6ab88d;
-  --w2-link: #0047ab;
   --w2-radius: 12px;
   --w2-radius-icon: 10px;
   --w2-check: #059669;
@@ -83,18 +82,36 @@
   font-family: var(--w2-font);
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s, transform 0.15s;
   box-sizing: border-box;
+  transform: translateY(0);
 }
 
 .welcome-slide2__card:hover {
   border-color: #d1d5db;
   background: #f9fafb;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.06);
 }
 
 .welcome-slide2__card--selected {
   border-color: var(--w2-cta);
   background: #f0fdf4;
+  box-shadow: 0 0 0 2px rgba(127, 199, 161, 0.25);
+}
+
+.welcome-slide2__card--selected:hover {
+  border-color: var(--w2-cta) !important;
+  background: #f0fdf4 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 2px rgba(127, 199, 161, 0.25), 0 10px 26px rgba(0, 0, 0, 0.06);
+}
+
+.welcome-slide2__card--selected:active,
+.welcome-slide2__card--selected:focus,
+.welcome-slide2__card--selected:focus-visible {
+  border-color: var(--w2-cta) !important;
+  background: #f0fdf4 !important;
   box-shadow: 0 0 0 2px rgba(127, 199, 161, 0.25);
 }
 
@@ -180,45 +197,37 @@
   flex-shrink: 0;
 }
 
+/* ── CTA button: gray by default, green once a card is selected ── */
+
 .welcome-slide2__cta {
   display: block;
   width: 100%;
   padding: 16px 24px;
-  background: var(--w2-cta);
+  background: #d1d5db;
   color: #ffffff;
   border: none;
   border-radius: var(--w2-radius);
   font-family: var(--w2-font);
   font-size: 16px;
   font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, transform 0.15s;
-  margin-bottom: 20px;
+  cursor: not-allowed;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  margin-bottom: 0;
   box-sizing: border-box;
 }
 
-.welcome-slide2__cta:hover {
+.welcome-slide2__cta--active {
+  background: var(--w2-cta);
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(7, 63, 33, 0.25);
+}
+
+.welcome-slide2__cta--active:hover {
   background: var(--w2-cta-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px rgba(106, 184, 141, 0.28);
 }
 
-.welcome-slide2__cta:active {
+.welcome-slide2__cta--active:active {
   transform: scale(0.99);
-}
-
-.welcome-slide2__signin {
-  text-align: center;
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--w2-text);
-  margin: 0;
-}
-
-.welcome-slide2__signin-link {
-  font-weight: 600;
-  color: var(--w2-link);
-  text-decoration: none;
-}
-
-.welcome-slide2__signin-link:hover {
-  text-decoration: underline;
 }

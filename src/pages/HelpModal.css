@@ -1,0 +1,339 @@
+/* ===== HelpModal.css - Popup Design ===== */
+
+.help-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  animation: popupFadeIn 0.2s ease-out;
+}
+
+.help-sheet {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 0;
+  width: 90%;
+  max-width: 400px;
+  max-height: 85vh;
+  overflow-y: auto;
+  z-index: 10000;
+  animation: popupScaleIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes popupFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes popupScaleIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.help-handle {
+  width: 36px;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  margin: 12px auto 0;
+}
+
+.help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.help-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #6b7280;
+}
+
+.help-close-btn ion-icon {
+  font-size: 1.5rem;
+}
+
+.help-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.help-header-spacer {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.help-sub-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 10001;
+  animation: popupFadeIn 0.15s ease-out;
+}
+
+.help-sub-sheet {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 0;
+  width: 92%;
+  max-width: 400px;
+  max-height: 82vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 10002;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  animation: popupScaleIn 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  /* Keep form controls light even when the app shell uses dark / Ionic variables */
+  color-scheme: light;
+  color: #1f2937;
+}
+
+.help-sub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.help-sub-body {
+  padding: 16px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.help-guide-scroll {
+  max-height: min(60vh, 420px);
+}
+
+.help-guide-lead {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 12px;
+}
+
+.help-guide-block {
+  margin-bottom: 14px;
+}
+
+.help-guide-h3 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1d4ed8;
+  margin: 0 0 4px;
+}
+
+.help-guide-p {
+  font-size: 0.8125rem;
+  color: #4b5563;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.help-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.help-sub-sheet .help-select,
+.help-sub-sheet .help-textarea {
+  background-color: #ffffff;
+  color: #111827;
+  -webkit-text-fill-color: #111827;
+  caret-color: #111827;
+}
+
+.help-select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #1f2937;
+  background: #fff;
+  margin-bottom: 14px;
+}
+
+.help-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  color: #1f2937;
+  background: #f9fafb;
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+  margin-bottom: 10px;
+}
+
+.help-textarea::placeholder {
+  color: #6b7280;
+  opacity: 1;
+}
+
+.help-textarea:focus,
+.help-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  background-color: #ffffff;
+  color: #111827;
+  -webkit-text-fill-color: #111827;
+}
+
+.help-form-hint {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0 0 8px;
+  line-height: 1.45;
+}
+
+.help-form-error {
+  color: #b91c1c;
+  margin-top: 4px;
+}
+
+.help-form-success {
+  color: #047857;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin: 0 0 12px;
+  line-height: 1.45;
+}
+
+.help-primary-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.help-primary-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.help-stars {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.help-star {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+  color: #d1d5db;
+  transition: color 0.15s ease, transform 0.12s ease;
+}
+
+.help-star--on {
+  color: #fbbf24;
+}
+
+.help-star:focus-visible {
+  outline: 2px solid #3b82f6;
+  border-radius: 4px;
+}
+
+.help-body {
+  padding: 16px;
+}
+
+.help-subtitle {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin: 0 0 16px;
+}
+
+.help-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.help-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid #e5e7eb;
+  cursor: pointer;
+}
+
+.help-item:last-child {
+  border-bottom: none;
+}
+
+.help-item:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.help-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.help-item-icon {
+  font-size: 1.25rem;
+}
+
+.help-item-text {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.help-item-sub {
+  font-size: 0.6875rem;
+  color: #6b7280;
+  margin-top: 1px;
+}
+
+.help-item-chevron {
+  font-size: 1.125rem;
+  color: #9ca3af;
+}

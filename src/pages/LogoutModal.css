@@ -1,0 +1,209 @@
+/* ═══════════════════════════════════════════════════════════
+   LogoutModal.css — class names match LogoutModal.tsx (lo-*)
+   Uses Profile.css design tokens
+══════════════════════════════════════════════════════════ */
+
+/* ── Backdrop ── */
+.lo-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 18, 40, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 200;
+  animation: lo-fade 0.2s ease both;
+}
+
+@keyframes lo-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Modal card ── */
+.lo-modal {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  z-index: 201;
+
+  width: calc(100% - 48px);
+  max-width: 320px;
+  height: fit-content;
+
+  background: var(--surface, #fff);
+  border-radius: 22px;
+  padding: 32px 24px 24px;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.20),
+    0 4px 16px rgba(0, 0, 0, 0.08);
+  text-align: center;
+  font-family: var(--font, 'Poppins', sans-serif);
+
+  animation: lo-pop 0.28s cubic-bezier(0.34, 1.25, 0.64, 1) both;
+}
+
+@keyframes lo-pop {
+  from { opacity: 0; transform: scale(0.88) translateY(10px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0);    }
+}
+
+/* ── Close button ── */
+.lo-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: var(--border, #e4e9f2);
+  color: var(--muted, #6b7a99);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+}
+.lo-close:hover:not(:disabled) { background: #fde8e8; color: var(--red, #dc2626); }
+.lo-close:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Icon ── */
+.lo-icon-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.lo-icon-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.18);
+}
+
+.lo-icon {
+  font-size: 1.75rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--red, #dc2626);
+}
+
+/* ── Text ── */
+.lo-title {
+  font-size: 1.125rem;
+  font-weight: 800;
+  color: var(--text, #1a2340);
+  letter-spacing: -0.015em;
+  margin: 0 0 8px;
+}
+
+.lo-desc {
+  font-size: 0.875rem;
+  color: var(--muted, #6b7a99);
+  line-height: 1.6;
+  margin: 0 0 18px;
+}
+
+/* ── Warning note ── */
+.lo-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(251, 191, 36, 0.10);
+  border: 1px solid rgba(251, 191, 36, 0.30);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 22px;
+  text-align: left;
+  font-size: 0.775rem;
+  font-weight: 500;
+  color: var(--text, #1a2340);
+  line-height: 1.5;
+}
+
+.lo-note__icon {
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+  color: var(--orange, #ea580c);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ── Action buttons ── */
+.lo-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.lo-btn {
+  flex: 1;
+  height: 46px;
+  border-radius: var(--radius-sm, 10px);
+  border: none;
+  font-family: var(--font, 'Poppins', sans-serif);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.12s, box-shadow 0.18s, opacity 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.lo-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.lo-btn--cancel {
+  background: var(--bg, #f4f6fb);
+  color: var(--muted, #6b7a99);
+  border: 1.5px solid var(--border, #e4e9f2);
+}
+.lo-btn--cancel:hover:not(:disabled) {
+  background: #edf0f8;
+  color: var(--text, #1a2340);
+}
+.lo-btn--cancel:active:not(:disabled) { transform: scale(0.97); }
+
+.lo-btn--confirm {
+  background: var(--red, #dc2626);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.30);
+}
+.lo-btn--confirm:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.40);
+  transform: translateY(-1px);
+}
+.lo-btn--confirm:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+}
+.lo-btn--loading { pointer-events: none; }
+
+.lo-btn__icon {
+  font-size: 1rem;
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ── Spinner ── */
+.lo-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: lo-spin 0.65s linear infinite;
+}
+
+@keyframes lo-spin {
+  to { transform: rotate(360deg); }
+}

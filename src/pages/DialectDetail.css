@@ -1,0 +1,364 @@
+/* ===== DialectDetail – design tokens (inherits Learn palette) ===== */
+.dialect-detail,
+.dialect-detail-content {
+  --dd-bg: #F8F9FA;
+  --dd-card-bg: #FFFFFF;
+  --dd-text: #003DA5;
+  --dd-text-muted: #666666;
+  --dd-accent: #C41E3A;
+  --dd-secondary: #FFD700;
+  --dd-radius: 16px;
+  --dd-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --dd-font: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.dialect-detail-content {
+  --background: var(--dd-bg);
+  --padding-bottom: 88px;
+}
+
+/* ===== Page wrapper ===== */
+.dialect-detail {
+  min-height: 100%;
+  background: var(--dd-bg);
+  font-family: var(--dd-font);
+  color: var(--dd-text);
+  padding-bottom: calc(32px + 72px + env(safe-area-inset-bottom, 0));
+}
+
+/* ===== Hero header ===== */
+.dialect-detail__header {
+  position: relative;
+  padding: 56px 24px 72px;
+  overflow: hidden;
+}
+
+.dialect-detail__back {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  cursor: pointer;
+  z-index: 10;
+  backdrop-filter: blur(6px);
+  transition: background 0.2s;
+}
+
+.dialect-detail__back:hover {
+  background: rgba(255, 255, 255, 0.38);
+}
+
+.dialect-detail__hero-text {
+  position: relative;
+  z-index: 3;
+  text-align: left;
+}
+
+.dialect-detail__name {
+  font-size: 32px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 4px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  line-height: 1.1;
+}
+
+.dialect-detail__native {
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0 0 14px;
+}
+
+.dialect-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dialect-detail__badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dialect-detail__badge--difficulty {
+  background: rgba(255, 215, 0, 0.3);
+  border-color: rgba(255, 215, 0, 0.5);
+}
+
+.dialect-detail__wave {
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  z-index: 2;
+}
+
+/* ===== Sections list ===== */
+.dialect-detail__sections {
+  padding: 20px 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ===== Individual section card ===== */
+.dialect-section {
+  background: var(--dd-card-bg);
+  border-radius: var(--dd-radius);
+  box-shadow: var(--dd-shadow);
+  overflow: hidden;
+  border: 1.5px solid transparent;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  animation: sectionSlideIn 0.5s ease-out both;
+}
+
+@keyframes sectionSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sectionHighlight {
+  0% {
+    box-shadow: 0 0 0 rgba(250, 204, 21, 0.4);
+    border-color: rgba(250, 204, 21, 0.9);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(250, 204, 21, 0.7);
+    border-color: rgba(250, 204, 21, 0.9);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(250, 204, 21, 0);
+    border-color: rgba(196, 30, 58, 0.2);
+  }
+}
+
+.dialect-section--open {
+  border-color: rgba(196, 30, 58, 0.2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.dialect-section--highlight {
+  animation: sectionHighlight 2s ease-out;
+}
+
+/* Section header button */
+.dialect-section__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dialect-section__header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dialect-section__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.dialect-section__label {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--dd-text);
+  margin: 0 0 2px;
+  line-height: 1.3;
+}
+
+.dialect-section__preview {
+  font-size: 0.75rem;
+  color: var(--dd-text-muted);
+  margin: 0;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.dialect-section__chevron {
+  font-size: 22px;
+  color: var(--dd-text-muted);
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.dialect-section__chevron--open {
+  transform: rotate(90deg);
+  color: var(--dd-accent);
+}
+
+/* ===== Section expanded content ===== */
+.dialect-section__content {
+  padding: 0 16px 16px;
+  border-top: 1px solid #F0F0F0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: contentExpand 0.25s ease-out;
+}
+
+@keyframes contentExpand {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== Content items ===== */
+.dialect-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #F8F9FA;
+  border: 1px solid #EFEFEF;
+  transition: background 0.15s;
+}
+
+.dialect-item:hover {
+  background: #F0F4FF;
+}
+
+.dialect-item__main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dialect-item__native {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--dd-text);
+}
+
+.dialect-item__english {
+  font-size: 0.825rem;
+  font-weight: 500;
+  color: var(--dd-accent);
+}
+
+.dialect-item__note {
+  font-size: 0.75rem;
+  color: var(--dd-text-muted);
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+/* Number items get a special look */
+.dialect-item--number {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  padding: 8px 12px;
+}
+
+.dialect-item--number .dialect-item__main {
+  flex: 1;
+}
+
+.dialect-item--number .dialect-item__english {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--dd-text-muted);
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ===== Practice button ===== */
+.dialect-section__practice-btn {
+  margin-top: 8px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: var(--dd-font);
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+}
+
+.dialect-section__practice-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+/* ===== Not found ===== */
+.dialect-detail__not-found {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--dd-text-muted);
+}
+
+.dialect-detail__not-found button {
+  margin-top: 16px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  background: var(--dd-text);
+  color: #fff;
+  font-family: var(--dd-font);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ===== Highlight when scrolled to (from assistant suggestion) ===== */
+.learn-section--highlight {
+  border-color: var(--dd-accent) !important;
+  box-shadow: 0 0 0 3px rgba(196, 30, 58, 0.2), 0 4px 16px rgba(0,0,0,0.1) !important;
+  animation: sectionPulse 1.8s ease forwards;
+}
+
+@keyframes sectionPulse {
+  0%   { transform: scale(1); }
+  15%  { transform: scale(1.012); }
+  35%  { transform: scale(1); }
+  55%  { transform: scale(1.006); }
+  100% { transform: scale(1); }
+}

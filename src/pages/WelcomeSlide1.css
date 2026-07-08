@@ -47,60 +47,65 @@
 }
 
 .welcome-slide1__title {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
   color: var(--w1-text);
-  margin: 0 0 12px;
-  line-height: 1.3;
+  margin: 0 0 8px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
-.welcome-slide1__intro {
+.welcome-slide1__subtitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--w1-text-muted);
+  margin: 0 0 14px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.welcome-slide1__lede {
   font-size: 15px;
   font-weight: 400;
   color: var(--w1-text);
   margin: 0;
-  text-align: left;
+  line-height: 1.55;
+  text-align: center;
 }
 
-.welcome-slide1__options {
+.welcome-slide1__features {
   list-style: none;
-  margin: 0 0 20px;
+  margin: 22px 0 20px;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
-.welcome-slide1__card {
+.welcome-slide1__feature {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
-  padding: 14px 16px;
+  padding: 12px 14px;
   background: #ffffff;
   border: 1px solid var(--w1-border);
   border-radius: var(--w1-radius);
   font-family: var(--w1-font);
-  font-size: 15px;
-  font-weight: 400;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--w1-text);
   text-align: left;
-  cursor: pointer;
-  transition: border-color 0.2s, box-shadow 0.2s;
   box-sizing: border-box;
 }
 
-.welcome-slide1__card:hover {
-  border-color: #d1d5db;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.welcome-slide1__card-icon {
-  font-size: 1.25em;
+.welcome-slide1__feature-icon {
+  font-size: 1.2em;
   flex-shrink: 0;
+  line-height: 1;
 }
 
-.welcome-slide1__card-label {
+.welcome-slide1__feature-label {
   flex: 1;
 }
 
@@ -119,7 +124,9 @@
 }
 
 .welcome-slide1__cta {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 100%;
   padding: 16px 24px;
   background: linear-gradient(90deg, var(--w1-cta-start) 0%, var(--w1-cta-end) 100%);
@@ -132,6 +139,8 @@
   cursor: pointer;
   transition: opacity 0.2s, transform 0.15s;
   box-sizing: border-box;
+  text-decoration: none;
+  text-align: center;
 }
 
 .welcome-slide1__cta:hover {

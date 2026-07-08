@@ -1,0 +1,560 @@
+/* ================================================================
+   CardDetailModal.css
+   ================================================================ */
+
+/* ── Draggable sheet variant ── */
+.cdm-sheet--draggable {
+  transition: max-height 0.38s cubic-bezier(0.32, 0.72, 0, 1), transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  touch-action: pan-y;
+}
+
+/* ── Drag handle ── */
+.cdm-drag-handle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 16px 6px;
+  cursor: grab;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.cdm-drag-handle:active { cursor: grabbing; }
+.cdm-drag-handle__bar {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.15);
+  display: block;
+}
+.cdm-drag-handle__hint {
+  font-size: 0.5625rem;
+  font-weight: 600;
+  color: #9aa5be;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: opacity 0.2s;
+}
+
+/* ── Hero expandable ── */
+.cdm-hero--expandable {
+  flex-shrink: 0;
+  transition: height 0.38s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ── Expand hint overlay ── */
+.cdm-hero-expand-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  border-radius: 20px;
+  padding: 5px 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  animation: cdm-hint-bounce 1.6s ease-in-out infinite;
+  white-space: nowrap;
+}
+.cdm-hero-expand-hint svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+@keyframes cdm-hint-bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); opacity: 1; }
+  50% { transform: translateX(-50%) translateY(-4px); opacity: 0.8; }
+}
+
+/* ── Hidden body in peek mode ── */
+.cdm-body--hidden {
+  display: none;
+}
+
+/* Override the old ::before pseudo-element since we now have explicit drag handle */
+.cdm-sheet--draggable::before { display: none; }
+
+
+.cdm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  transition: background 0.32s ease;
+  cursor: pointer;
+}
+.cdm-overlay--in { background: rgba(0, 0, 0, 0.55); }
+
+/* ── Sheet ── */
+.cdm-sheet {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90dvh;
+  background: #ffffff;
+  border-radius: 24px 24px 0 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+  transform: translateY(100%);
+  transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.18);
+}
+.cdm-sheet--in { transform: translateY(0); }
+
+.cdm-sheet::before {
+  content: '';
+  display: block;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.15);
+  margin: 10px auto 0;
+  flex-shrink: 0;
+}
+
+/* ── Hero ── */
+.cdm-hero {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #e5e7eb;
+}
+.cdm-hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cdm-hero-grad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.65) 100%);
+  pointer-events: none;
+}
+
+.cdm-close {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.40);
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s, transform 0.15s;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.cdm-close:active { background: rgba(0,0,0,0.65); transform: scale(0.92); }
+.cdm-close svg { width: 16px; height: 16px; }
+
+.cdm-hero-region-pill {
+  position: absolute;
+  top: 12px; left: 12px;
+  background: rgba(255,255,255,0.90);
+  border-radius: 20px;
+  padding: 3px 9px;
+  font-size: 0.625rem; font-weight: 700; color: #1a2340;
+  display: flex; align-items: center; gap: 5px;
+  backdrop-filter: blur(6px); line-height: 1.5;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.cdm-hero-region-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%; flex-shrink: 0; display: inline-block;
+}
+.cdm-hero-speakers-pill {
+  position: absolute;
+  top: 12px; right: 52px;
+  background: rgba(0,0,0,0.45);
+  border-radius: 20px;
+  padding: 3px 9px;
+  font-size: 0.625rem; font-weight: 600; color: #fff;
+  backdrop-filter: blur(6px); line-height: 1.5;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.cdm-hero-name-wrap {
+  position: absolute;
+  bottom: 14px; left: 16px; right: 16px;
+}
+.cdm-hero-tag {
+  display: inline-block;
+  background: var(--tag-color, #0047ab);
+  color: #fff;
+  font-size: 0.5625rem; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 20px; line-height: 1.5;
+  margin-bottom: 5px;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.cdm-hero-title {
+  font-size: 1.5rem; font-weight: 800; color: #fff;
+  margin: 0 0 2px; line-height: 1.2;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.45);
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.cdm-hero-native {
+  font-size: 0.75rem; font-weight: 500;
+  color: rgba(255,255,255,0.82); margin: 0;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.35);
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── Scrollable body ── */
+.cdm-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 20px 20px calc(20px + 60px + env(safe-area-inset-bottom, 0));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ── Facts row ── */
+.cdm-facts-row { display: flex; gap: 8px; }
+.cdm-fact {
+  flex: 1;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 10px 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.cdm-fact-val {
+  font-size: 0.9375rem; font-weight: 800; color: #1a2340;
+  letter-spacing: -0.02em; line-height: 1.2;
+}
+.cdm-fact-lbl {
+  font-size: 0.5625rem; font-weight: 600; color: #9aa5be;
+  text-transform: uppercase; letter-spacing: 0.06em; line-height: 1.2;
+}
+
+/* ── Short desc ── */
+.cdm-desc {
+  font-size: 0.875rem; font-weight: 400; color: #374151;
+  line-height: 1.65; margin: 0;
+}
+
+/* ── Highlights ── */
+.cdm-section-label {
+  font-size: 0.6875rem; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: #9aa5be;
+  margin-bottom: -8px;
+}
+.cdm-highlights { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.cdm-highlight-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 0.8125rem; font-weight: 500; color: #1f2937; line-height: 1.45;
+}
+.cdm-check {
+  width: 18px; height: 18px; flex-shrink: 0;
+  background: linear-gradient(135deg, #0047ab, #7c3aed);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; margin-top: 1px;
+}
+.cdm-check svg { width: 10px; height: 10px; }
+
+/* ── Divider ── */
+.cdm-divider {
+  height: 1px;
+  background: #e5e7eb;
+  margin: 4px 0;
+}
+
+/* ── Rich section wrapper ── */
+.cdm-rich-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Section heading ── */
+.cdm-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.cdm-section-heading__emoji {
+  font-size: 1rem; line-height: 1; flex-shrink: 0;
+}
+.cdm-section-heading__text {
+  font-size: 0.8125rem; font-weight: 700; color: #1a2340; letter-spacing: 0.01em;
+}
+
+/* ── Info row ── */
+.cdm-info-row {
+  display: flex; flex-direction: column; gap: 2px;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 10px 12px;
+}
+.cdm-info-label {
+  font-size: 0.5625rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: #9aa5be;
+}
+.cdm-info-value {
+  font-size: 0.75rem; font-weight: 500; color: #374151; line-height: 1.5;
+}
+
+/* ── Sub-labels & body copy ── */
+.cdm-rich-label {
+  font-size: 0.6875rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.07em; color: #9aa5be;
+  margin: 4px 0 0;
+}
+.cdm-rich-body {
+  font-size: 0.8125rem; font-weight: 400; color: #374151;
+  line-height: 1.65; margin: 0;
+}
+
+/* ── Fun fact box ── */
+.cdm-fun-fact {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px;
+  padding: 12px 14px;
+}
+.cdm-fun-fact__icon { font-size: 1rem; line-height: 1.4; flex-shrink: 0; }
+.cdm-fun-fact__text {
+  font-size: 0.8125rem; font-weight: 500; color: #1e40af;
+  line-height: 1.6; margin: 0;
+}
+
+/* ── Word order example ── */
+.cdm-example-box {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-left: 3px solid #0047ab;
+  border-radius: 0 10px 10px 0;
+  padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.cdm-example-sentence {
+  font-size: 0.875rem; font-weight: 700; color: #1a2340;
+  margin: 0; font-style: italic;
+}
+.cdm-example-breakdown {
+  font-size: 0.75rem; font-weight: 400; color: #6b7280;
+  margin: 0; line-height: 1.5;
+}
+
+/* ── Bullet list ── */
+.cdm-bullet-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.cdm-bullet-item {
+  font-size: 0.8125rem; font-weight: 400; color: #374151;
+  line-height: 1.55; padding-left: 14px; position: relative;
+}
+.cdm-bullet-item::before {
+  content: '•'; position: absolute; left: 0;
+  color: #0047ab; font-weight: 700;
+}
+
+/* ── Expressions ── */
+.cdm-expressions-list { display: flex; flex-direction: column; gap: 10px; }
+.cdm-expression-card {
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 4px;
+}
+.cdm-expression-phrase {
+  font-size: 0.9375rem; font-weight: 700; color: #1a2340; margin: 0;
+}
+.cdm-expression-literal {
+  font-size: 0.6875rem; font-weight: 500; color: #9aa5be; margin: 0; font-style: italic;
+}
+.cdm-expression-meaning {
+  font-size: 0.8125rem; font-weight: 400; color: #374151; margin: 0; line-height: 1.5;
+}
+
+/* ── Traditions ── */
+.cdm-traditions-list { display: flex; flex-direction: column; gap: 10px; }
+.cdm-tradition-item {
+  border-left: 3px solid #0d9488;
+  padding: 6px 0 6px 12px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.cdm-tradition-name {
+  font-size: 0.8125rem; font-weight: 700; color: #1a2340; margin: 0;
+}
+.cdm-tradition-desc {
+  font-size: 0.75rem; font-weight: 400; color: #4b5563; line-height: 1.55; margin: 0;
+}
+
+/* ── Dishes grid ── */
+.cdm-dishes-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+}
+.cdm-dish-card {
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+.cdm-dish-name {
+  font-size: 0.8125rem; font-weight: 700; color: #1a2340; margin: 0;
+}
+.cdm-dish-desc {
+  font-size: 0.6875rem; font-weight: 400; color: #6b7280; line-height: 1.5; margin: 0;
+}
+
+/* ── Values ── */
+.cdm-values-list { display: flex; flex-direction: column; gap: 10px; }
+.cdm-value-item {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 10px 12px;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px;
+}
+.cdm-value-name {
+  font-size: 0.8125rem; font-weight: 700; color: #1a2340; margin: 0;
+}
+.cdm-value-desc {
+  font-size: 0.75rem; font-weight: 400; color: #4b5563; line-height: 1.55; margin: 0;
+}
+
+/* ── Identity title ── */
+.cdm-identity-title {
+  font-size: 0.9375rem; font-weight: 700; color: #0047ab; margin: 0 0 4px;
+}
+
+/* ── Proverbs ── */
+.cdm-proverbs-list { display: flex; flex-direction: column; gap: 10px; }
+.cdm-proverb-card {
+  background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 12px;
+  padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
+}
+.cdm-proverb-text {
+  font-size: 0.875rem; font-weight: 600; color: #5b21b6;
+  font-style: italic; line-height: 1.5; margin: 0;
+}
+.cdm-proverb-translation {
+  font-size: 0.75rem; font-weight: 400; color: #6b7280; line-height: 1.5; margin: 0;
+}
+
+/* ── CTA ── */
+.cdm-cta-wrap { margin-top: 4px; }
+
+.cdm-already-active {
+  display: flex; align-items: center; gap: 10px;
+  background: #f0fdf4; border: 1.5px solid #bbf7d0;
+  border-radius: 14px; padding: 14px 16px;
+  font-size: 0.875rem; color: #15803d;
+}
+.cdm-already-check {
+  width: 22px; height: 22px; flex-shrink: 0;
+  background: #22c55e; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.cdm-already-check svg { width: 12px; height: 12px; }
+
+.cdm-proceed-btn {
+  width: 100%;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: var(--btn-color, #0047ab);
+  color: #fff; border: none; border-radius: 14px;
+  padding: 15px 20px;
+  font-size: 0.9375rem; font-weight: 700;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+  cursor: pointer; letter-spacing: 0.01em;
+  transition: filter 0.15s, transform 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cdm-proceed-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+.cdm-proceed-btn:active { filter: brightness(0.88); transform: scale(0.98); }
+
+.cdm-coming-soon {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: #fefce8; border: 1.5px solid #fde68a;
+  border-radius: 14px; padding: 14px 16px;
+  font-size: 0.875rem; font-weight: 600; color: #92400e; text-align: center;
+}
+/* ================================================================
+   Tab system
+   ================================================================ */
+
+/* ── Tab bar ── */
+.cdm-tab-bar {
+  display: flex;
+  gap: 6px;
+  background: #f3f4f6;
+  border-radius: 0;
+  padding: 8px 20px;
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-top: 1px solid #e5e7eb;
+  z-index: 100;
+}
+
+.cdm-tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px 8px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.12s;
+  -webkit-tap-highlight-color: transparent;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+.cdm-tab-btn:active { transform: scale(0.94); }
+
+.cdm-tab-btn--active {
+  background: transparent;
+  box-shadow: none;
+  border-bottom: 3px solid var(--tab-color, #0047ab);
+}
+
+.cdm-tab-btn__emoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.cdm-tab-btn__label {
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #9aa5be;
+  text-transform: uppercase;
+  transition: color 0.18s;
+}
+
+.cdm-tab-btn--active .cdm-tab-btn__label {
+  color: var(--tab-color, #0047ab);
+}
+
+/* ── Tab panel ── */
+.cdm-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: cdm-tab-fade 0.22s ease;
+}
+
+@keyframes cdm-tab-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Empty state ── */
+.cdm-tab-empty {
+  font-size: 0.875rem;
+  color: #9aa5be;
+  text-align: center;
+  padding: 32px 16px;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+}
