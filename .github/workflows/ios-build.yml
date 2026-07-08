@@ -1,0 +1,121 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-ios-ipa:
+    runs-on: macos-14
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web bundle
+        run: npm run build
+
+      - name: Sync Capacitor iOS
+        run: |
+          npx cap add ios
+          npx cap sync ios
+
+      - name: Install CocoaPods
+        run: |
+          sudo gem install cocoapods -N
+          cd ios
+          pod install
+
+      - name: Set up code signing (cert + provisioning profile)
+        env:
+          IOS_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          IOS_CERTIFICATE_P12_PASSWORD: ${{ secrets.IOS_CERTIFICATE_P12_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+          IOS_EXPORT_METHOD: ${{ secrets.IOS_EXPORT_METHOD }}
+        run: |
+          set -euo pipefail
+
+          KEYCHAIN_PASSWORD="ios-build-keychain"
+          KEYCHAIN_PATH="$RUNNER_TEMP/ios-build.keychain-db"
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          PROFILE_PATH="$RUNNER_TEMP/profile.mobileprovision"
+          METHOD="${IOS_EXPORT_METHOD:-ad-hoc}"
+
+          echo "$IOS_CERTIFICATE_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$IOS_CERTIFICATE_P12_PASSWORD" -T /usr/bin/codesign
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          PROFILE_PLIST="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$PROFILE_PLIST")
+          echo "Provisioning profile UUID: $PROFILE_UUID"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          cat > ios/ExportOptions.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+            <dict>
+              <key>method</key>
+              <string>$METHOD</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>teamID</key>
+              <string>$IOS_TEAM_ID</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                <key>$IOS_BUNDLE_ID</key>
+                <string>$PROFILE_UUID</string>
+              </dict>
+            </dict>
+          </plist>
+          EOF
+
+      - name: Build and export IPA
+        env:
+          BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+        run: |
+          set -euo pipefail
+
+          cd ios
+
+          xcodebuild \
+            -workspace "App/App.xcworkspace" \
+            -scheme "App" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath "$PWD/build/App.xcarchive" \
+            archive
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$PWD/build/App.xcarchive" \
+            -exportPath "$PWD/build" \
+            -exportOptionsPlist "$PWD/ExportOptions.plist"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: ios/build/*.ipa
+          if-no-files-found: error
+
