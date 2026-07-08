@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "446844764828",
+    "project_id": "salintayo-74453",
+    "storage_bucket": "salintayo-74453.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:446844764828:android:bfab2639eda66079096359",
+        "android_client_info": {
+          "package_name": "io.ionic.starter"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "446844764828-asej5pu56odjstk9l8c3dd049nf7sc12.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCOApiUHDoEhXlJtdXfByYi-F-l43n6y4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "446844764828-asej5pu56odjstk9l8c3dd049nf7sc12.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

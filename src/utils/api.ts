@@ -1,11 +1,24 @@
-import { firebaseAuth } from '../firebase';
+import { firebaseApp, firebaseAuth } from '../firebase';
+import { getOpenRouterFetchHeaders } from './openRouterClient';
 
 /**
  * Base URL for Firebase Cloud Functions.
  * Set VITE_FUNCTIONS_URL in .env (e.g. https://us-central1-YOUR_PROJECT.cloudfunctions.net)
  * For local emulator: http://127.0.0.1:5001/YOUR_PROJECT/us-central1
  */
-const FUNCTIONS_BASE = import.meta.env.VITE_FUNCTIONS_URL || '';
+const FUNCTIONS_REGION = (import.meta.env.VITE_FUNCTIONS_REGION || 'us-central1').trim();
+
+function resolveFunctionsBaseUrl(): string {
+  const explicit = (import.meta.env.VITE_FUNCTIONS_URL || '').trim().replace(/\/+$/, '');
+  if (explicit) return explicit;
+
+  const projectId = (firebaseApp.options.projectId || '').trim();
+  if (!projectId || projectId === 'placeholder') return '';
+
+  return `https://${FUNCTIONS_REGION}-${projectId}.cloudfunctions.net`;
+}
+
+const FUNCTIONS_BASE = resolveFunctionsBaseUrl();
 
 /**
  * Call a public Cloud Function (no auth required).
@@ -15,7 +28,7 @@ async function callPublicApi<T = unknown>(
   options: Omit<RequestInit, 'body'> & { body?: unknown } = {}
 ): Promise<T> {
   if (!FUNCTIONS_BASE) {
-    throw new Error('VITE_FUNCTIONS_URL is not set. Add it to .env');
+    throw new Error('Cloud Functions URL is not configured. Set VITE_FUNCTIONS_URL or Firebase projectId env values.');
   }
   const url = `${FUNCTIONS_BASE}/${functionName}`;
   const { body, ...rest } = options;
@@ -58,7 +71,9 @@ export async function callProtectedApi<T = unknown>(
   }
 
   if (!FUNCTIONS_BASE) {
-    throw new Error('VITE_FUNCTIONS_URL is not set. Add it to .env for the Chat API.');
+    throw new Error(
+      'Cloud Functions URL is not configured. Set VITE_FUNCTIONS_URL or Firebase projectId env values for Chat API.'
+    );
   }
 
   const url = `${FUNCTIONS_BASE}/${functionName}`;
@@ -76,7 +91,7 @@ export async function callProtectedApi<T = unknown>(
     const msg = e instanceof Error ? e.message : String(e);
     if (msg === 'Failed to fetch' || msg.includes('Load failed') || msg.includes('NetworkError')) {
       throw new Error(
-        'Cannot reach the server (network or CORS). Make sure you ran "firebase deploy --only functions" and that chatCompletion is deployed.'
+        'Cannot reach Cloud Functions (network or CORS). Set VITE_FUNCTIONS_URL, deploy functions (e.g. transcribeWhisper/chatCompletion), or use the emulator URL.'
       );
     }
     throw e;
@@ -105,33 +120,6 @@ export interface DeepSeekMessage {
   content: string;
 }
 
-/** Mark the current user as registered (app sign-up). Called after successful registration. */
-export async function markUserRegistered(): Promise<void> {
-  await callProtectedApi('markUserRegistered', { method: 'POST', body: JSON.stringify({}) });
-}
-
-/** Request a 6-digit password reset code to be sent to the given email. */
-export async function sendPasswordResetCode(email: string): Promise<void> {
-  await callPublicApi('sendPasswordResetCode', { method: 'POST', body: { email } });
-}
-
-/** Verify the password reset code. Throws if invalid or expired. */
-export async function verifyPasswordResetCode(email: string, code: string): Promise<void> {
-  await callPublicApi('verifyPasswordResetCode', { method: 'POST', body: { email, code } });
-}
-
-/** Reset password using the verified code. */
-export async function resetPasswordWithCode(
-  email: string,
-  code: string,
-  newPassword: string
-): Promise<void> {
-  await callPublicApi('resetPasswordWithCode', {
-    method: 'POST',
-    body: { email, code, newPassword },
-  });
-}
-
 const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || '';
 const OPENROUTER_MODEL = 'deepseek/deepseek-chat';
 
@@ -149,11 +137,7 @@ export async function chatWithDeepSeek(messages: DeepSeekMessage[]): Promise<str
 
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : '',
-    },
+    headers: getOpenRouterFetchHeaders(OPENROUTER_API_KEY),
     body: JSON.stringify({
       model: OPENROUTER_MODEL,
       messages,
@@ -176,4 +160,78 @@ export async function chatWithDeepSeek(messages: DeepSeekMessage[]): Promise<str
     throw new Error(data.error.message || 'OpenRouter error');
   }
   return data.choices?.[0]?.message?.content ?? '';
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read audio blob'));
+    reader.onloadend = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        reject(new Error('Unexpected FileReader result'));
+        return;
+      }
+      const commaIndex = result.indexOf(',');
+      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
+const LOGIC_URL = (import.meta.env.VITE_LOGIC_URL || '').trim().replace(/\/+$/, '');
+const LOGIC_API_KEY = import.meta.env.VITE_LOGIC_API_KEY || '';
+
+/** Transcription via your self-hosted logic service (Python Whisper). */
+async function transcribeWhisperDirectLogic(
+  audioBlob: Blob,
+  whisperModel?: string
+): Promise<{ text: string }> {
+  if (!LOGIC_URL) {
+    throw new Error('VITE_LOGIC_URL is not set. Point it to your hosted logic service (e.g. https://your-logic-host).');
+  }
+
+  const audioBase64 = await blobToBase64(audioBlob);
+  const res = await fetch(`${LOGIC_URL}/logic/transcribeWhisper`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(LOGIC_API_KEY ? { 'x-logic-key': LOGIC_API_KEY } : {}),
+    },
+    body: JSON.stringify({
+      audio_base64: audioBase64,
+      mime_type: audioBlob.type || 'audio/webm',
+      whisper_model: whisperModel,
+    }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.detail || data?.error || data?.message || `Logic request failed: ${res.status}`);
+  }
+
+  return data as { text: string };
+}
+
+async function transcribeWhisperViaFunctions(audioBlob: Blob, whisperModel?: string): Promise<{ text: string }> {
+  const audioBase64 = await blobToBase64(audioBlob);
+  return callProtectedApi<{ text: string }>('transcribeWhisper', {
+    method: 'POST',
+    body: JSON.stringify({
+      audio_base64: audioBase64,
+      mime_type: audioBlob.type || 'audio/webm',
+      whisper_model: whisperModel,
+    }),
+  });
+}
+
+/** Transcription via self-hosted logic service (preferred) with Cloud Functions fallback. */
+export async function transcribeWhisper(
+  audioBlob: Blob,
+  whisperModel?: string
+): Promise<{ text: string }> {
+  if (LOGIC_URL) {
+    return transcribeWhisperDirectLogic(audioBlob, whisperModel);
+  }
+  return transcribeWhisperViaFunctions(audioBlob, whisperModel);
 }

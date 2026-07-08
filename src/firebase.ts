@@ -1,5 +1,6 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
+import { getFirestore, initializeFirestore, persistentLocalCache, type Firestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || 'placeholder',
@@ -12,14 +13,20 @@ const firebaseConfig = {
 
 let app: FirebaseApp;
 let auth: Auth;
+let db: Firestore;
 
 function getFirebase() {
   if (!app) {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
+    try {
+      db = initializeFirestore(app, { localCache: persistentLocalCache({}) });
+    } catch {
+      db = getFirestore(app);
+    }
   }
-  return { app, auth };
+  return { app, auth, db };
 }
 
-export const { app: firebaseApp, auth: firebaseAuth } = getFirebase();
+export const { app: firebaseApp, auth: firebaseAuth, db: firebaseDb } = getFirebase();
 export default getFirebase;

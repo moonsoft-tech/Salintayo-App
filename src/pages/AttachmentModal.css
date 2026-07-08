@@ -1,0 +1,192 @@
+/* =====================================================================
+   AttachmentModal.css — SalinTayo
+   Simple bottom-sheet overlay for Camera / Photo Gallery.
+   Prefixed "am-" to avoid collisions.
+   ===================================================================== */
+
+/* ── Backdrop ─────────────────────────────────────────────── */
+.am-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  z-index: 200;
+  animation: amFadeIn 0.18s ease;
+}
+
+@keyframes amFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Bottom sheet with safe area ──────────────────────────── */
+.am-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 201;
+  background: #ffffff;
+  border-radius: 20px 20px 0 0;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0));
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12);
+  animation: amSlideUp 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes amSlideUp {
+  from { transform: translateY(100%); opacity: 0.7; }
+  to   { transform: translateY(0);    opacity: 1;   }
+}
+
+/* ── Drag handle ──────────────────────────────────────────── */
+.am-handle {
+  width: 36px;
+  height: 4px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  margin: 12px auto 0;
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+.am-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 12px;
+}
+
+.am-title {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #1f2937;
+  letter-spacing: -0.01em;
+}
+
+.am-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 1.1rem;
+  transition: background 0.2s, color 0.2s;
+}
+
+.am-close ion-icon {
+  font-size: 1.1rem;
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.am-close:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* ── Option buttons row ───────────────────────────────────── */
+.am-options {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  padding: 20px 24px 8px;
+}
+
+.am-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 14px;
+  transition: background 0.15s, transform 0.15s;
+  min-width: 80px;
+}
+
+.am-option:hover {
+  background: #f9fafb;
+}
+
+.am-option:active {
+  transform: scale(0.95);
+}
+
+/* Icon circle */
+.am-option__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  font-size: 1.75rem;
+  transition: transform 0.15s, box-shadow 0.2s;
+}
+
+.am-option__icon ion-icon {
+  font-size: 1.75rem;
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.am-option__icon--camera {
+  background: linear-gradient(135deg, #1877f2 0%, #0ea5e9 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(24, 119, 242, 0.3);
+}
+
+.am-option__icon--gallery {
+  background: linear-gradient(135deg, #ed2939 0%, #f97316 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(237, 41, 57, 0.28);
+}
+
+.am-option:hover .am-option__icon {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+
+/* Label */
+.am-option__label {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #374151;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+/* ── Cancel button with safe area awareness ───────────────── */
+.am-cancel {
+  display: block;
+  width: calc(100% - 48px);
+  margin: 16px auto calc(8px + env(safe-area-inset-bottom, 0));
+  padding: 13px;
+  border: none;
+  border-radius: 12px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.am-cancel:hover {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.am-cancel:active {
+  transform: scale(0.98);
+}
