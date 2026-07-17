@@ -1,0 +1,65 @@
+workflows:
+  salintayo-ios-workflow:
+    name: Salintayo iOS Workflow
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic # Rename to match your Codemagic App Store Connect integration
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: io.ionic.starter
+      vars:
+        XCODE_WORKSPACE: "App.xcworkspace"
+        XCODE_SCHEME: "App"
+        APP_STORE_APP_ID: 0000000000 # App Store Connect > App > General > App Information
+      node: 20
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: NewUpdate3
+          include: true
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm ci
+      - name: Build web bundle
+        script: |
+          npm run build
+      - name: Add and sync Capacitor iOS project
+        script: |
+          if [ ! -d ios ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios/App && pod install
+      - name: Set up code signing settings on Xcode project
+        script: |
+          xcode-project use-profiles
+      - name: Increment build number
+        script: |
+          cd $CM_BUILD_DIR/ios/App
+          agvtool new-version -all $(($BUILD_NUMBER))
+      - name: Build ipa for distribution
+        script: |
+          cd $CM_BUILD_DIR/ios/App
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - ios/App/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      email:
+        recipients:
+          - moonsoft2.0@gmail.com
+        notify:
+          success: true
+          failure: true
