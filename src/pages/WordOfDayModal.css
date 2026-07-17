@@ -1,0 +1,267 @@
+/* ═══════════════════════════════════════════════════════════
+   WORD OF THE DAY MODAL — matches LanguageModal / Quiz design tokens
+═══════════════════════════════════════════════════════════ */
+
+.wod-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.50);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
+  animation: wod-fadeIn 0.2s ease;
+}
+
+@keyframes wod-fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.wod-sheet {
+  width: 100%;
+  max-width: 380px;
+  background: #ffffff;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.08);
+  animation: wod-popIn 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes wod-popIn {
+  from { transform: scale(0.93) translateY(8px); opacity: 0; }
+  to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.wod-header {
+  position: relative;
+  padding: 18px 44px 18px 20px;
+  color: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wod-header__title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.wod-header__dialect {
+  font-size: 0.8rem;
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+.wod-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wod-close-btn:hover { background: rgba(255, 255, 255, 0.32); }
+.wod-close-btn svg { width: 16px; height: 16px; }
+
+.wod-body {
+  padding: 28px 24px 26px;
+  font-family: 'Poppins', sans-serif;
+  text-align: center;
+}
+
+.wod-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.wod-state__icon {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+}
+.wod-state__icon--success { color: #059669; }
+.wod-state__icon--error { color: #dc2626; }
+
+.wod-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #0047ab;
+  border-radius: 50%;
+  animation: wod-spin 0.7s linear infinite;
+  margin-bottom: 4px;
+}
+
+@keyframes wod-spin {
+  to { transform: rotate(360deg); }
+}
+
+.wod-practice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.wod-word {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #1f2937;
+  margin: 0 0 2px;
+  letter-spacing: -0.01em;
+}
+
+.wod-meaning {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4b5563;
+  margin: 0;
+}
+
+.wod-example {
+  font-size: 0.82rem;
+  font-style: italic;
+  color: #6b7280;
+  margin: 2px 0 6px;
+}
+
+.wod-speaker-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  border: 1.5px solid #0047ab;
+  background: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.15s, opacity 0.15s;
+}
+.wod-speaker-btn:hover:not(:disabled) { background: #f5f8ff; }
+.wod-speaker-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.wod-speaker-btn svg { width: 18px; height: 18px; }
+
+.wod-divider {
+  width: 100%;
+  height: 1px;
+  background: #e5e7eb;
+  margin: 16px 0 8px;
+}
+
+.wod-mic-btn {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: none;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 71, 171, 0.3);
+  transition: transform 0.15s;
+}
+.wod-mic-btn:active { transform: scale(0.95); }
+.wod-mic-btn svg { width: 30px; height: 30px; }
+
+.wod-mic-btn--active {
+  background: #dc2626 !important;
+  box-shadow: 0 0 0 8px rgba(220, 38, 38, 0.15);
+  animation: wod-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes wod-pulse {
+  0%, 100% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0.15); }
+  50%       { box-shadow: 0 0 0 12px rgba(220, 38, 38, 0.08); }
+}
+
+.wod-recording {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.wod-recording__timer {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #dc2626;
+  font-variant-numeric: tabular-nums;
+}
+
+.wod-hint {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin: 6px 0 0;
+}
+
+.wod-score {
+  font-size: 2.4rem;
+  font-weight: 800;
+  margin: 6px 0 0;
+  line-height: 1;
+}
+
+.wod-feedback {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 4px 0 0;
+}
+
+.wod-result-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+.wod-retry-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1.5px solid #e5e7eb;
+  background: #f9fafb;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4b5563;
+  cursor: pointer;
+}
+.wod-retry-btn svg { width: 16px; height: 16px; }
+.wod-retry-btn:hover { background: #f3f4f6; }
+
+.wod-done-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  color: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}

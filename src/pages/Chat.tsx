@@ -40,7 +40,6 @@ import {
   chatThreadExists,
   deleteAllChatThreads,
   deleteChatThread,
-  fetchChatMessages,
   mergeChatMessages,
   migrateLocalSessionsToFirestoreIfEmpty,
   subscribeChatMessages,
@@ -581,58 +580,14 @@ interface ChatSession {
   savedAt: number;
 }
 
-/** localStorage key for the active guest thread (persists across app restarts on mobile). */
+/** sessionStorage key for the active thread (survives refresh in the same tab; cleared on New Chat). */
 function sessionMessagesStorageKey(uid: string): string {
   return `salintayo_chat_current_session:${uid}`;
 }
 
-/** localStorage: last opened Firestore chat id (signed-in users). */
+/** sessionStorage: last opened Firestore chat id (signed-in users). */
 function activeChatIdStorageKey(uid: string): string {
   return `salintayo_chat_active_chat_id:${uid}`;
-}
-
-function guestCurrentSessionIdKey(uid: string): string {
-  return `salintayo_chat_active_guest_session:${uid}`;
-}
-
-function getGuestCurrentSessionId(uid: string): string | null {
-  try {
-    return localStorage.getItem(guestCurrentSessionIdKey(uid));
-  } catch {
-    return null;
-  }
-}
-
-function setGuestCurrentSessionId(uid: string, id: string) {
-  try {
-    localStorage.setItem(guestCurrentSessionIdKey(uid), id);
-  } catch {
-    /* ignore */
-  }
-}
-
-function clearGuestCurrentSessionId(uid: string) {
-  try {
-    localStorage.removeItem(guestCurrentSessionIdKey(uid));
-  } catch {
-    /* ignore */
-  }
-}
-
-/** One-time migration from sessionStorage (cleared on Android app kill). */
-function migrateChatStorageFromSession(uid: string) {
-  for (const keyFn of [sessionMessagesStorageKey, activeChatIdStorageKey]) {
-    try {
-      const key = keyFn(uid);
-      const legacy = sessionStorage.getItem(key);
-      if (legacy && !localStorage.getItem(key)) {
-        localStorage.setItem(key, legacy);
-      }
-      if (legacy) sessionStorage.removeItem(key);
-    } catch {
-      /* ignore */
-    }
-  }
 }
 
 /** After a full reload, blob: audio URLs are invalid; drop them so playback UI does not reference dead resources. */
@@ -647,34 +602,12 @@ function sanitizeMessagesAfterReload(messages: ChatMessage[]): ChatMessage[] {
 }
 
 function loadSessionMessages(uid: string): ChatMessage[] {
-  migrateChatStorageFromSession(uid);
   try {
-    const raw = localStorage.getItem(sessionMessagesStorageKey(uid));
+    const raw = sessionStorage.getItem(sessionMessagesStorageKey(uid));
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
     return sanitizeMessagesAfterReload(parsed as ChatMessage[]);
-  } catch {
-    return [];
-  }
-}
-
-function deriveChatTitle(msgs: ChatMessage[]): string {
-  const firstUser = msgs.find((m) => m.role === 'user');
-  if (!firstUser) return 'New chat';
-  if (firstUser.type === 'image') {
-    const t = firstUser.content.trim();
-    return t ? (t.length > 40 ? `${t.slice(0, 40)}…` : t) : 'Image';
-  }
-  const text = firstUser.content.trim();
-  return text.length > 40 ? `${text.slice(0, 40)}…` : text;
-}
-
-function loadGuestSessionMessages(uid: string, sessionId: string): ChatMessage[] {
-  try {
-    const sessions = JSON.parse(localStorage.getItem(`salintayo_chat_sessions:${uid}`) || '[]') as ChatSession[];
-    const match = sessions.find((s) => s.id === sessionId);
-    return match?.messages?.length ? sanitizeMessagesAfterReload(match.messages) : [];
   } catch {
     return [];
   }
@@ -705,23 +638,6 @@ const formatDuration = (seconds: number) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-function isUserCancelledError(error: unknown): boolean {
-  const msg = error instanceof Error ? error.message : String(error);
-  return /cancel/i.test(msg) || /dismiss/i.test(msg);
-}
-
-async function readImageRefAsDataUrl(webPath: string): Promise<string> {
-  if (webPath.startsWith('data:')) return webPath;
-  const response = await fetch(webPath);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Failed to read selected image.'));
-    reader.readAsDataURL(blob);
-  });
-}
-
 const ChatPage: React.FC = () => {
   const { user } = useAuth();
   const location = useLocation<LocationState>();
@@ -730,8 +646,6 @@ const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const currentChatIdRef = useRef<string | null>(null);
-  const chatInitPromiseRef = useRef<Promise<string | null> | null>(null);
-  const chatInitUidRef = useRef<string | null>(null);
   useEffect(() => {
     currentChatIdRef.current = currentChatId;
   }, [currentChatId]);
@@ -791,54 +705,14 @@ const ChatPage: React.FC = () => {
     user?.uid ? [] : loadSessionsForUser(storageUid)
   );
 
-  const ensureCurrentChatId = useCallback(async (): Promise<string | null> => {
-    const uid = user?.uid;
-    if (!uid) return null;
-    if (currentChatIdRef.current) return currentChatIdRef.current;
-    if (chatInitPromiseRef.current && chatInitUidRef.current === uid) {
-      const id = await chatInitPromiseRef.current;
-      if (id) setCurrentChatId(id);
-      return id;
-    }
-    migrateChatStorageFromSession(uid);
-    let preferred: string | null = null;
-    try {
-      preferred = localStorage.getItem(activeChatIdStorageKey(uid));
-    } catch {
-      preferred = null;
-    }
-    if (preferred) {
-      const exists = await chatThreadExists(uid, preferred);
-      if (exists) {
-        setCurrentChatId(preferred);
-        return preferred;
-      }
-    }
-    const newId = await createEmptyChat(uid);
-    setCurrentChatId(newId);
-    try {
-      localStorage.setItem(activeChatIdStorageKey(uid), newId);
-    } catch {
-      /* ignore */
-    }
-    return newId;
-  }, [user?.uid]);
-
   const persistCloudMessage = useCallback(
     (msg: ChatMessage) => {
       const uid = user?.uid;
-      if (!uid) return;
-      void (async () => {
-        try {
-          const cid = await ensureCurrentChatId();
-          if (!cid) return;
-          await upsertChatMessage(uid, cid, msg);
-        } catch (err) {
-          console.error('Chat save failed:', err);
-        }
-      })();
+      const cid = currentChatIdRef.current;
+      if (!uid || !cid) return;
+      void upsertChatMessage(uid, cid, msg).catch((err) => console.error('Chat save failed:', err));
     },
-    [user?.uid, ensureCurrentChatId]
+    [user?.uid]
   );
 
   // Guest: session list from localStorage. Signed-in: live thread list from Firestore.
@@ -875,51 +749,45 @@ const ChatPage: React.FC = () => {
   // Signed-in: resolve Firestore thread id + optional one-time migration from legacy localStorage.
   useEffect(() => {
     if (!user?.uid) {
-      chatInitPromiseRef.current = null;
-      chatInitUidRef.current = null;
       setCurrentChatId(null);
       return;
     }
     setMessages([]);
     let cancelled = false;
-    const uid = user.uid;
-    chatInitUidRef.current = uid;
-    chatInitPromiseRef.current = (async () => {
+    void (async () => {
       try {
-        await migrateLocalSessionsToFirestoreIfEmpty(uid, loadSessionsForUser(uid));
+        await migrateLocalSessionsToFirestoreIfEmpty(user.uid, loadSessionsForUser(user.uid));
       } catch (e) {
         console.error('Chat migration failed:', e);
       }
-      if (cancelled) return null;
-      migrateChatStorageFromSession(uid);
+      if (cancelled) return;
       let preferred: string | null = null;
       try {
-        preferred = localStorage.getItem(activeChatIdStorageKey(uid));
+        preferred = sessionStorage.getItem(activeChatIdStorageKey(user.uid));
       } catch {
         preferred = null;
       }
       if (preferred) {
-        const exists = await chatThreadExists(uid, preferred);
-        if (cancelled) return null;
-        if (exists) return preferred;
+        const exists = await chatThreadExists(user.uid, preferred);
+        if (cancelled) return;
+        if (exists) {
+          setCurrentChatId(preferred);
+          return;
+        }
       }
       try {
-        const newId = await createEmptyChat(uid);
-        if (cancelled) return null;
+        const newId = await createEmptyChat(user.uid);
+        if (cancelled) return;
+        setCurrentChatId(newId);
         try {
-          localStorage.setItem(activeChatIdStorageKey(uid), newId);
+          sessionStorage.setItem(activeChatIdStorageKey(user.uid), newId);
         } catch {
           /* ignore */
         }
-        return newId;
       } catch (e) {
         console.error('Could not start chat thread:', e);
-        return null;
       }
     })();
-    void chatInitPromiseRef.current.then((id) => {
-      if (!cancelled && id) setCurrentChatId(id);
-    });
     return () => {
       cancelled = true;
     };
@@ -952,36 +820,14 @@ const ChatPage: React.FC = () => {
     return () => window.clearTimeout(t);
   }, [messages, user?.uid, currentChatId]);
 
-  // Guest: persist current thread + session list to localStorage (survives app restarts on mobile).
+  // Guest only: persist current thread to sessionStorage (signed-in uses Firestore).
   useEffect(() => {
     if (user?.uid) return;
     try {
-      localStorage.setItem(sessionMessagesStorageKey(storageUid), JSON.stringify(messages));
+      sessionStorage.setItem(sessionMessagesStorageKey(storageUid), JSON.stringify(messages));
     } catch {
       /* ignore quota */
     }
-    if (messages.length === 0) return;
-
-    const timer = window.setTimeout(() => {
-      let sessionId = getGuestCurrentSessionId(storageUid);
-      if (!sessionId) {
-        sessionId = `s-${Date.now()}`;
-        setGuestCurrentSessionId(storageUid, sessionId);
-      }
-      const entry: ChatSession = {
-        id: sessionId,
-        title: deriveChatTitle(messages),
-        messages,
-        savedAt: Date.now(),
-      };
-      const sessions = loadSessionsForUser(storageUid);
-      const idx = sessions.findIndex((s) => s.id === sessionId);
-      const updated =
-        idx >= 0 ? sessions.map((s, i) => (i === idx ? entry : s)) : [entry, ...sessions];
-      persistSessionsForUser(storageUid, updated.slice(0, 50));
-      setSavedSessions(updated.slice(0, 50));
-    }, 600);
-    return () => window.clearTimeout(timer);
   }, [messages, storageUid, user?.uid]);
 
   const deleteSession = (sessionId: string) => {
@@ -997,7 +843,7 @@ const ChatPage: React.FC = () => {
             const newId = await createEmptyChat(user.uid);
             setCurrentChatId(newId);
             try {
-              localStorage.setItem(activeChatIdStorageKey(user.uid), newId);
+              sessionStorage.setItem(activeChatIdStorageKey(user.uid), newId);
             } catch {
               /* ignore */
             }
@@ -1023,10 +869,9 @@ const ChatPage: React.FC = () => {
         }
         try {
           const newId = await createEmptyChat(user.uid);
-          prevSubChatIdRef.current = null;
           setCurrentChatId(newId);
           try {
-            localStorage.setItem(activeChatIdStorageKey(user.uid), newId);
+            sessionStorage.setItem(activeChatIdStorageKey(user.uid), newId);
           } catch {
             /* ignore */
           }
@@ -1040,14 +885,18 @@ const ChatPage: React.FC = () => {
     }
     persistSessionsForUser(storageUid, []);
     setSavedSessions([]);
-    try {
-      localStorage.removeItem(sessionMessagesStorageKey(storageUid));
-    } catch {
-      /* ignore */
-    }
-    clearGuestCurrentSessionId(storageUid);
-    setMessages([]);
     setShowClearConfirm(false);
+  };
+
+  const deriveTitle = (msgs: ChatMessage[]): string => {
+    const firstUser = msgs.find((m) => m.role === 'user');
+    if (!firstUser) return 'New chat';
+    if (firstUser.type === 'image') {
+      const t = firstUser.content.trim();
+      return t ? (t.length > 40 ? `${t.slice(0, 40)}…` : t) : 'Image';
+    }
+    const text = firstUser.content.trim();
+    return text.length > 40 ? `${text.slice(0, 40)}…` : text;
   };
 
   const groupSessions = (sessions: ChatSession[]) => {
@@ -1069,90 +918,41 @@ const ChatPage: React.FC = () => {
     return groups.filter((g) => g.sessions.length > 0);
   };
 
-  const chatHistory = groupSessions(
-    user?.uid
-      ? savedSessions.filter((s) => s.title !== 'New chat' || s.id === currentChatId)
-      : savedSessions
-  );
-
-  const finalizeGuestSession = useCallback(
-    (msgs: ChatMessage[], sessionId: string | null) => {
-      if (!msgs.length) return null;
-      const sid = sessionId ?? `s-${Date.now()}`;
-      const entry: ChatSession = {
-        id: sid,
-        title: deriveChatTitle(msgs),
-        messages: msgs,
-        savedAt: Date.now(),
-      };
-      const sessions = loadSessionsForUser(storageUid);
-      const idx = sessions.findIndex((s) => s.id === sid);
-      const updated =
-        idx >= 0 ? sessions.map((s, i) => (i === idx ? entry : s)) : [entry, ...sessions];
-      persistSessionsForUser(storageUid, updated.slice(0, 50));
-      setSavedSessions(updated.slice(0, 50));
-      return sid;
-    },
-    [storageUid]
-  );
-
-  const openHistorySession = useCallback(
-    (session: ChatSession) => {
-      setIsHistoryOpen(false);
-      if (user?.uid) {
-        prevSubChatIdRef.current = null;
-        setMessages([]);
-        setCurrentChatId(session.id);
-        try {
-          localStorage.setItem(activeChatIdStorageKey(user.uid), session.id);
-        } catch {
-          /* ignore */
-        }
-        void fetchChatMessages(user.uid, session.id)
-          .then((msgs) => {
-            if (currentChatIdRef.current !== session.id) return;
-            let loaded = sanitizeMessagesAfterReload(msgs as ChatMessage[]);
-            if (!loaded.length) {
-              loaded = loadGuestSessionMessages(user.uid, session.id);
-            }
-            setMessages(loaded);
-          })
-          .catch((err) => console.error('Failed to load chat history:', err));
-        return;
-      }
-
-      const stored = loadGuestSessionMessages(storageUid, session.id);
-      const msgs =
-        stored.length > 0
-          ? stored
-          : sanitizeMessagesAfterReload(session.messages ?? []);
-      setGuestCurrentSessionId(storageUid, session.id);
-      setMessages(msgs);
-      try {
-        localStorage.setItem(sessionMessagesStorageKey(storageUid), JSON.stringify(msgs));
-      } catch {
-        /* ignore */
-      }
-    },
-    [user?.uid, storageUid]
-  );
-
-  // Guest: refresh session list from disk when opening history (ensures messages are available).
+  const wasHistoryOpenRef = useRef(false);
+  // When the history drawer opens, persist the current thread if it is not already in the list.
+  // Compare against all sessions — not only sessions[0] — so loading an older item from history
+  // and opening the drawer again does not prepend a duplicate of that thread.
   useEffect(() => {
-    if (isHistoryOpen && !user?.uid) {
-      setSavedSessions(loadSessionsForUser(storageUid));
-    }
-  }, [isHistoryOpen, user?.uid, storageUid]);
+    const justOpened = isHistoryOpen && !wasHistoryOpenRef.current;
+    wasHistoryOpenRef.current = isHistoryOpen;
+    if (!justOpened || messages.length === 0) return;
+    if (user?.uid) return;
+
+    const sessions = loadSessionsForUser(storageUid);
+    const msgJson = JSON.stringify(messages);
+    if (sessions.some((s) => JSON.stringify(s.messages) === msgJson)) return;
+
+    const newSession: ChatSession = {
+      id: `s-${Date.now()}`,
+      title: deriveTitle(messages),
+      messages,
+      savedAt: Date.now(),
+    };
+    const updated = [newSession, ...sessions].slice(0, 50);
+    persistSessionsForUser(storageUid, updated);
+    setSavedSessions(updated);
+  }, [isHistoryOpen, messages, storageUid, user?.uid]);
+
+  const chatHistory = groupSessions(savedSessions);
 
   const startNewChat = () => {
     if (user?.uid) {
       void (async () => {
         try {
           const newId = await createEmptyChat(user.uid);
-          prevSubChatIdRef.current = null;
           setCurrentChatId(newId);
           try {
-            localStorage.setItem(activeChatIdStorageKey(user.uid), newId);
+            sessionStorage.setItem(activeChatIdStorageKey(user.uid), newId);
           } catch {
             /* ignore */
           }
@@ -1170,10 +970,8 @@ const ChatPage: React.FC = () => {
       })();
       return;
     }
-    finalizeGuestSession(messages, getGuestCurrentSessionId(storageUid));
     try {
-      localStorage.removeItem(sessionMessagesStorageKey(storageUid));
-      clearGuestCurrentSessionId(storageUid);
+      sessionStorage.removeItem(sessionMessagesStorageKey(storageUid));
     } catch {
       /* ignore */
     }
@@ -1386,7 +1184,6 @@ Always respond primarily in ${lang.label} when the user communicates in English.
 
   const handleSpeakAiMessage = useCallback((msg: ChatMessage) => {
     if (msg.role !== 'ai' || !msg.content.trim()) return;
-    if (!('speechSynthesis' in window)) return;
 
     if (speakingTtsMessageId === msg.id) {
       cancelSpeech();
@@ -1503,53 +1300,39 @@ Always respond primarily in ${lang.label} when the user communicates in English.
     setIsAttachmentModalOpen(true);
   };
 
-  const addPendingImage = useCallback((data: string) => {
-    const newImage: PendingImage = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      data,
-      caption: '',
-      selected: false,
-    };
-    setPendingImages((prev) => [...prev, newImage]);
-    setIsImageTrayOpen(true);
-  }, []);
+  const isMediaPickerCancel = (message: string) =>
+    /cancel|cancell?ed|no image picked|user denied/i.test(message);
 
-  const showImagePickerError = useCallback((error: unknown) => {
-    if (isUserCancelledError(error)) return;
-    const message = error instanceof Error ? error.message : 'Unable to access image source.';
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'ai',
-      content: `⚠️ ${message}`,
-      timestamp: formatTime(),
-    };
-    setMessages((prev) => [...prev, userMessage]);
-    if (user?.uid) persistCloudMessage(userMessage);
-  }, [persistCloudMessage, user?.uid]);
+  const webPathToDataUrl = async (webPath: string): Promise<string> => {
+    const response = await fetch(webPath);
+    const blob = await response.blob();
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error('Failed to read selected image.'));
+      reader.readAsDataURL(blob);
+    });
+  };
 
-  const pickNativeGallery = useCallback(async () => {
-    try {
-      // Let the attachment sheet finish closing before launching the system picker.
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const result = await Camera.pickImages({ quality: 90 });
-      if (!result.photos.length) return;
-
-      for (const photo of result.photos) {
-        const dataUrl = await readImageRefAsDataUrl(photo.webPath);
-        addPendingImage(dataUrl);
-      }
-    } catch (error) {
-      showImagePickerError(error);
-    }
-  }, [addPendingImage, showImagePickerError]);
+  const reportMediaError = useCallback(
+    (error: unknown, fallback: string) => {
+      const message = error instanceof Error ? error.message : fallback;
+      if (isMediaPickerCancel(message)) return;
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'ai',
+        content: `⚠️ ${message}`,
+        timestamp: formatTime(),
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      if (user?.uid) persistCloudMessage(userMessage);
+    },
+    [persistCloudMessage, user?.uid]
+  );
 
   const pickNativeCamera = useCallback(async () => {
     try {
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      const perms = await Camera.requestPermissions({ permissions: ['camera'] });
-      if (perms.camera !== 'granted' && perms.camera !== 'limited') {
-        throw new Error('Camera permission is required to take photos.');
-      }
+      await Camera.requestPermissions({ permissions: ['camera'] });
       const photo = await Camera.getPhoto({
         source: CameraSource.Camera,
         resultType: CameraResultType.DataUrl,
@@ -1558,11 +1341,72 @@ Always respond primarily in ${lang.label} when the user communicates in English.
       if (!photo.dataUrl) {
         throw new Error('No image data returned by device.');
       }
-      addPendingImage(photo.dataUrl);
+      const newImage: PendingImage = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        data: photo.dataUrl,
+        caption: '',
+        selected: false,
+      };
+      setPendingImages((prev) => [...prev, newImage]);
+      setIsImageTrayOpen(true);
     } catch (error) {
-      showImagePickerError(error);
+      reportMediaError(error, 'Unable to access camera.');
     }
-  }, [addPendingImage, showImagePickerError]);
+  }, [reportMediaError]);
+
+  const pickNativeGallery = useCallback(async () => {
+    try {
+      // Prefer pickImages — uses Android Photo Picker and avoids the photos
+      // permission gate that can fail/silent-block getPhoto(Photos) on newer Android.
+      const result = await Camera.pickImages({
+        quality: 90,
+        limit: 10,
+      });
+      if (!result.photos?.length) return;
+
+      const images: PendingImage[] = [];
+      for (const photo of result.photos) {
+        if (!photo.webPath) continue;
+        const dataUrl = await webPathToDataUrl(photo.webPath);
+        images.push({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          data: dataUrl,
+          caption: '',
+          selected: false,
+        });
+      }
+      if (images.length === 0) {
+        throw new Error('No image data returned by gallery.');
+      }
+      setPendingImages((prev) => [...prev, ...images]);
+      setIsImageTrayOpen(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (isMediaPickerCancel(message)) return;
+
+      // Fallback for devices where pickImages activity cannot resolve.
+      try {
+        const photo = await Camera.getPhoto({
+          source: CameraSource.Photos,
+          resultType: CameraResultType.DataUrl,
+          quality: 90,
+        });
+        if (!photo.dataUrl) {
+          throw new Error('No image data returned by gallery.');
+        }
+        const newImage: PendingImage = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          data: photo.dataUrl,
+          caption: '',
+          selected: false,
+        };
+        setPendingImages((prev) => [...prev, newImage]);
+        setIsImageTrayOpen(true);
+      } catch (fallbackError) {
+        reportMediaError(fallbackError, message || 'Unable to open photo gallery.');
+      }
+    }
+  }, [reportMediaError]);
 
   const openGalleryPicker = useCallback(() => {
     if (Capacitor.isNativePlatform()) {
@@ -1580,7 +1424,10 @@ Always respond primarily in ${lang.label} when the user communicates in English.
     if (type === 'camera') {
       setIsAttachmentModalOpen(false);
       if (Capacitor.isNativePlatform()) {
-        void pickNativeCamera();
+        // Let the sheet finish closing before launching the camera Activity.
+        window.setTimeout(() => {
+          void pickNativeCamera();
+        }, 280);
         return;
       }
       setIsCameraModalOpen(true);
@@ -1588,6 +1435,12 @@ Always respond primarily in ${lang.label} when the user communicates in English.
     }
     if (type === 'gallery') {
       setIsAttachmentModalOpen(false);
+      if (Capacitor.isNativePlatform()) {
+        window.setTimeout(() => {
+          openGalleryPicker();
+        }, 280);
+        return;
+      }
       openGalleryPicker();
       return;
     }
@@ -1812,10 +1665,11 @@ Rules:
   ) => {
     if (isLoading) return;
 
-    const audioUrl = URL.createObjectURL(audioBlob);
+    const hasPlayableAudio = audioBlob.size > 0;
+    const audioUrl = hasPlayableAudio ? URL.createObjectURL(audioBlob) : undefined;
     const messageId = Date.now().toString();
     const trimmedTranscript = transcript.trim();
-    const voiceBubbleText = caption.trim();
+    const voiceBubbleText = caption.trim() || trimmedTranscript;
 
     const voiceUserMessage: ChatMessage = {
       id: messageId,
@@ -1832,10 +1686,10 @@ Rules:
     try {
       setIsLoading(true);
 
-      // Prefer device STT transcript. If empty, fall back to Whisper transcription.
+      // Prefer device STT transcript. If empty, fall back to Whisper (needs deployed Cloud Function).
       let sourceText = trimmedTranscript;
-      if (!sourceText) {
-        const t = await transcribeWhisper(audioBlob).catch(() => ({ text: '' }));
+      if (!sourceText && hasPlayableAudio) {
+        const t = await transcribeWhisper(audioBlob);
         sourceText = (t.text || '').trim();
       }
 
@@ -1843,7 +1697,9 @@ Rules:
         const aiMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'ai',
-          content: 'I couldn’t detect speech from that recording. Please try again and speak a bit louder/closer to the mic.',
+          content: hasPlayableAudio
+            ? 'I couldn’t detect speech from that recording. Please try again and speak a bit louder/closer to the mic.'
+            : 'I couldn’t detect speech. Please try again and speak clearly while Listening is shown.',
           timestamp: formatTime(),
         };
         setMessages((prev) => [...prev, aiMessage]);
@@ -1870,6 +1726,15 @@ Rules:
       if (user?.uid) persistCloudMessage(aiMessage);
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : 'Failed to process voice message';
+      const lowerErr = errMsg.toLowerCase();
+      const sttErrorHint =
+        lowerErr.includes('unsupported mime_type')
+          ? ' This recording format is not yet supported by the speech service.'
+          : lowerErr.includes('not authenticated')
+            ? ' Please sign in, then try again.'
+            : lowerErr.includes('network') || lowerErr.includes('cors') || lowerErr.includes('fetch')
+              ? ' Please check your internet connection and backend URL settings.'
+              : '';
       const failedVoice: ChatMessage = {
         ...voiceUserMessage,
         content: `🎤 Voice send failed: ${errMsg}`,
@@ -1884,7 +1749,7 @@ Rules:
       const aiErrorMessage: ChatMessage = {
         id: (Date.now() + 2).toString(),
         role: 'ai',
-        content: `Sorry, I couldn't process the voice request: ${errMsg}`,
+        content: `Sorry, I couldn't process the voice request: ${errMsg}.${sttErrorHint}`,
         timestamp: formatTime(),
       };
       setMessages((prev) => [...prev, aiErrorMessage]);
@@ -2162,7 +2027,19 @@ Rules:
                             <button
                               type="button"
                               className="chat-history-drawer__item"
-                              onClick={() => openHistorySession(session)}
+                              onClick={() => {
+                                if (user?.uid) {
+                                  setCurrentChatId(session.id);
+                                  try {
+                                    sessionStorage.setItem(activeChatIdStorageKey(user.uid), session.id);
+                                  } catch {
+                                    /* ignore */
+                                  }
+                                } else {
+                                  setMessages(session.messages ?? []);
+                                }
+                                setIsHistoryOpen(false);
+                              }}
                             >
                               {session.title}
                             </button>
@@ -2428,14 +2305,6 @@ Rules:
 
       <IonFooter className="chat-footer ion-no-border">
         <nav className="chat-nav" aria-label="Main">
-          <Link to="/learn" className="chat-nav__item">
-            <IonIcon icon={bookOutline} className="chat-nav__icon" />
-            <span className="chat-nav__label">Learn</span>
-          </Link>
-          <Link to="/quiz" className="chat-nav__item">
-            <IonIcon icon={documentTextOutline} className="chat-nav__icon" />
-            <span className="chat-nav__label">Quiz</span>
-          </Link>
           <Link to="/home" className="chat-nav__item">
             <IonIcon icon={homeOutline} className="chat-nav__icon" />
             <span className="chat-nav__label">Home</span>

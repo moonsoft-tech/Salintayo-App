@@ -752,14 +752,6 @@ const ProfilePage: React.FC = () => {
 
       <IonFooter className="profile-footer ion-no-border">
           <nav className="profile-nav" aria-label="Main">
-            <Link to="/learn" className="profile-nav__item">
-              <IonIcon icon={bookOutline} className="profile-nav__icon" />
-              <span className="profile-nav__label">Learn</span>
-            </Link>
-            <Link to="/quiz" className="profile-nav__item">
-              <IonIcon icon={documentTextOutline} className="profile-nav__icon" />
-              <span className="profile-nav__label">Quiz</span>
-            </Link>
             <Link to="/home" className="profile-nav__item">
               <IonIcon icon={homeOutline} className="profile-nav__icon" />
               <span className="profile-nav__label">Home</span>

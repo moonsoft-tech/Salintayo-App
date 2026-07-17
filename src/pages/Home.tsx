@@ -9,15 +9,18 @@ import {
   documentTextOutline,
   homeOutline,
   chatbubbleOutline,
+  micOutline,
+  checkmarkCircle,
 } from 'ionicons/icons';
 import './Home.css';
 import { useAuth } from '../contexts/AuthContext';
 import { firebaseDb } from '../firebase';
-import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { LANGUAGES, type Language } from './LanguageModal';
 import { getResolvedDialectLangCode } from '../utils/dialectPreference';
 import CardDetailModal from './CardDetailModal';
+import WordOfDayModal from './WordOfDayModal';
 import {
   LEARN_ACTIVITY_DATES_KEY,
   LEARN_STREAK_CHANGED_EVENT,
@@ -400,6 +403,9 @@ const HomePage: React.FC = () => {
   const [activeLanguageCode, setActiveLanguageCode] = useState(readDialectCodeFromStorage);
   const [selectedCard, setSelectedCard] = useState<(typeof culturalCards)[number] | null>(null);
   const [cardModalOpen, setCardModalOpen] = useState(false);
+  const [wodModalOpen, setWodModalOpen] = useState(false);
+  const [wodTodayScore, setWodTodayScore] = useState<number | null>(null);
+  const [wodStatusLoading, setWodStatusLoading] = useState(true);
   const [toast, setToast] = useState<ToastData | null>(null);
   const cultureCarouselTrackRef = useRef<HTMLDivElement>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -456,6 +462,16 @@ const HomePage: React.FC = () => {
         }
         if (typeof data.photoBase64 === 'string' && data.photoBase64.trim()) {
           setPhotoSrc(data.photoBase64);
+        }
+        // Firestore-saved dialect preference takes precedence so it follows
+        // the account across devices; falls back to local storage otherwise.
+        if (typeof data.activeDialect === 'string' && data.activeDialect.trim()) {
+          const savedDialect = data.activeDialect.trim().toLowerCase();
+          setActiveLanguageCode(savedDialect);
+          try {
+            localStorage.setItem(DIALECT_LANG_KEY, savedDialect);
+            localStorage.setItem(QCB_LANG_KEY, savedDialect);
+          } catch { /* ignore */ }
         }
       }
     } catch (e) {
@@ -602,6 +618,10 @@ const HomePage: React.FC = () => {
       window.dispatchEvent(new Event('salintayo_lang_changed'));
       window.dispatchEvent(new Event('salintayo_qcb_lang_changed'));
     } catch { /* ignore */ }
+    if (user?.uid) {
+      void setDoc(doc(firebaseDb, 'users', user.uid), { activeDialect: lang.code }, { merge: true })
+        .catch((e) => console.warn('Failed to save dialect preference to Firestore:', e));
+    }
     setToast({
       message: `Dialect switched to ${lang.name}`,
       sub: `${lang.native} · ${lang.region}`,
@@ -699,6 +719,55 @@ const HomePage: React.FC = () => {
   const circleCircumference = 2 * Math.PI * circleRadius;
   const circleOffset = circleCircumference * (1 - progressPercent / 100);
 
+  /** Accent color for the active dialect, reusing the same colors as the dialect carousel. */
+  const activeDialectAccent = useMemo(
+    () => culturalCards.find(c => c.dialectCode === activeLanguageCode)?.tagColor ?? '#0047ab',
+    [activeLanguageCode]
+  );
+
+  const activeDialectMeta = useMemo(
+    () => LANGUAGES.find((l: Language) => l.code === activeLanguageCode),
+    [activeLanguageCode]
+  );
+
+  /** Check whether today's Word of the Day has already been completed for this dialect. */
+  useEffect(() => {
+    if (!user?.uid) {
+      setWodTodayScore(null);
+      setWodStatusLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setWodStatusLoading(true);
+    (async () => {
+      try {
+        const dateKey = phDateKey();
+        const snap = await getDoc(doc(firebaseDb, 'users', user.uid, 'wordOfDayHistory', dateKey));
+        if (cancelled) return;
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data?.dialect === activeLanguageCode && typeof data?.score === 'number') {
+            setWodTodayScore(data.score);
+          } else {
+            setWodTodayScore(null);
+          }
+        } else {
+          setWodTodayScore(null);
+        }
+      } catch (e) {
+        console.warn('Failed to check Word of the Day status:', e);
+        if (!cancelled) setWodTodayScore(null);
+      } finally {
+        if (!cancelled) setWodStatusLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.uid, activeLanguageCode, wodModalOpen]);
+
+  const handleWodComplete = useCallback((completedScore: number) => {
+    setWodTodayScore(completedScore);
+  }, []);
+
   const streakWeek = useMemo(
     () => buildLoginStreakWeekRow(new Set(loginActivityDateKeys)),
     [loginActivityDateKeys]
@@ -750,6 +819,15 @@ const HomePage: React.FC = () => {
           onClose={() => setCardModalOpen(false)}
           onSelectDialect={handleDialectSelect}
           currentLanguageCode={activeLanguageCode}
+        />
+
+        <WordOfDayModal
+          isOpen={wodModalOpen}
+          onClose={() => setWodModalOpen(false)}
+          dialectId={activeLanguageCode}
+          dialectName={activeDialectMeta?.name ?? fluencyLanguageName}
+          accentColor={activeDialectAccent}
+          onComplete={handleWodComplete}
         />
 
         {/* Fire lighting overlay — rendered via portal to document.body */}
@@ -918,57 +996,32 @@ const HomePage: React.FC = () => {
             </div>
           </section>
 
-          {/* ===== Progress / Mastery Card ===== */}
-          <section className="home-progress">
-            <div className="home-progress__card">
-              <div className="home-progress__content">
-                <div className="home-progress__info">
-                  <h3 className="home-progress__label">Learning Level</h3>
-                  <p className="home-progress__value">
-                    {learningLevel.tier} proficiency sa {fluencyLanguageName}
-                  </p>
-                  <p className="home-progress__change">{learningLevel.weekChangeLabel}</p>
-                  <div className="home-progress__bar-wrap">
-                    <div
-                      className="home-progress__bar"
-                      role="progressbar"
-                      aria-valuenow={progressPercent}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    >
-                      <div className="home-progress__bar-fill" style={{ width: `${progressPercent}%` }} />
-                    </div>
-                  </div>
-                </div>
-                <div className="home-progress__circle-wrap" aria-label={`${progressPercent}% Proficiency`}>
-                  <svg className="home-progress__circle" viewBox={`0 0 ${circleSize} ${circleSize}`} role="img" aria-hidden="true">
-                    <circle
-                      className="home-progress__circle-bg"
-                      cx={circleSize / 2}
-                      cy={circleSize / 2}
-                      r={circleRadius}
-                      fill="none"
-                      strokeWidth={circleStroke}
-                    />
-                    <circle
-                      className="home-progress__circle-fill"
-                      cx={circleSize / 2}
-                      cy={circleSize / 2}
-                      r={circleRadius}
-                      fill="none"
-                      strokeWidth={circleStroke}
-                      strokeLinecap="round"
-                      strokeDasharray={`${circleCircumference} ${circleCircumference}`}
-                      strokeDashoffset={circleOffset}
-                    />
-                  </svg>
-                  <div className="home-progress__circle-text" aria-hidden="true">
-                    <span className="home-progress__circle-value">{progressPercent}</span>
-                    <span className="home-progress__circle-percent">%</span>
-                  </div>
-                </div>
+          {/* ===== Word of the Day Card ===== */}
+          <section className="home-wod">
+            <button
+              className="home-wod__card"
+              style={{ background: `linear-gradient(135deg, ${activeDialectAccent} 0%, #7c3aed 100%)` }}
+              onClick={() => setWodModalOpen(true)}
+            >
+              <div className="home-wod__icon-wrap">
+                <IonIcon icon={wodTodayScore !== null ? checkmarkCircle : micOutline} className="home-wod__icon" />
               </div>
-            </div>
+              <div className="home-wod__info">
+                <h3 className="home-wod__label">Word of the Day</h3>
+                {wodStatusLoading ? (
+                  <p className="home-wod__value">Loading…</p>
+                ) : wodTodayScore !== null ? (
+                  <p className="home-wod__value">Done — {wodTodayScore}% accuracy</p>
+                ) : (
+                  <p className="home-wod__value">
+                    Practice today's word in {activeDialectMeta?.name ?? fluencyLanguageName}
+                  </p>
+                )}
+              </div>
+              <span className="home-wod__cta">
+                {wodTodayScore !== null ? 'Review' : 'Practice'}
+              </span>
+            </button>
           </section>
 
           {/* ===== Day Streak ===== */}
@@ -1036,36 +1089,7 @@ const HomePage: React.FC = () => {
             </div>
           </section>
 
-          <section className="home-lessons" aria-label="Recent lessons">
-            <h3 className="home-lessons__title">Recent Lessons</h3>
-            <div className="home-lessons__carousel" ref={lessonsCarouselRef}>
-              {recentLessons.map((l, idx) => (
-                <div
-                  key={idx}
-                  className={[
-                    'home-lessons__card',
-                    l.active ? 'home-lessons__card--active' : '',
-                  ].filter(Boolean).join(' ')}
-                >
-                  <div className="home-lessons__card-icon" aria-hidden>{l.icon}</div>
-                  <h4 className="home-lessons__card-title">{l.title}</h4>
-                  <p className="home-lessons__card-desc">{l.desc}</p>
-                  <span className="home-lessons__card-status">{l.status}</span>
-                </div>
-              ))}
-            </div>
-            <div className="home-lessons__dots" aria-hidden>
-              {recentLessons.map((_, idx) => (
-                <span
-                  key={idx}
-                  className={[
-                    'home-lessons__dot',
-                    idx === lessonsCarouselIndex ? 'home-lessons__dot--active' : '',
-                  ].filter(Boolean).join(' ')}
-                />
-              ))}
-            </div>
-          </section>
+          
 
           <section className="home-recommendations">
             <h3 className="home-recommendations__title">SalinTayo Recommends</h3>
@@ -1090,14 +1114,6 @@ const HomePage: React.FC = () => {
 
         <footer className="home-footer">
           <nav className="home-nav" aria-label="Main">
-            <Link to="/learn" className="home-nav__item">
-              <IonIcon icon={bookOutline} className="home-nav__icon" />
-              <span className="home-nav__label">Learn</span>
-            </Link>
-            <Link to="/quiz" className="home-nav__item">
-              <IonIcon icon={documentTextOutline} className="home-nav__icon" />
-              <span className="home-nav__label">Quiz</span>
-            </Link>
             <Link to="/home" className={`home-nav__item ${isHome ? 'home-nav__item--active' : ''}`}>
               <IonIcon icon={homeOutline} className="home-nav__icon" />
               <span className="home-nav__label">Home</span>

@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { IonIcon } from '@ionic/react';
 import {
   micOutline,
@@ -11,6 +10,7 @@ import {
   trashOutline,
   volumeHighOutline,
 } from 'ionicons/icons';
+import { startSpeechToText, type SpeechToTextSession } from '../utils/speechToText';
 import './VoiceRecordModal.css';
 
 interface VoiceRecordModalProps {
@@ -20,6 +20,33 @@ interface VoiceRecordModalProps {
 }
 
 type VoiceState = 'idle' | 'recording' | 'preview';
+
+const MEDIA_RECORDER_MIME_CANDIDATES = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/mp4',
+  'audio/mpeg',
+];
+
+function pickMediaRecorderMimeType(): string | undefined {
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
+    return undefined;
+  }
+  return MEDIA_RECORDER_MIME_CANDIDATES.find((type) => MediaRecorder.isTypeSupported(type));
+}
+
+function normalizeRepeatedSpeech(text: string): string {
+  const cleaned = text.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+  const words = cleaned.split(' ');
+  if (words.length >= 2 && words.length % 2 === 0) {
+    const mid = words.length / 2;
+    const first = words.slice(0, mid).join(' ');
+    const second = words.slice(mid).join(' ');
+    if (first.toLowerCase() === second.toLowerCase()) return first;
+  }
+  return cleaned.replace(/\b(\w+)(?:\s+\1)+\b/gi, '$1');
+}
 
 interface BrowserSpeechRecognition {
   lang: string;
@@ -54,18 +81,21 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [recordingError, setRecordingError] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState('');
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioUrlRef = useRef<string | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const finalTranscriptRef = useRef('');
   const interimTranscriptRef = useRef('');
   const isStoppingRecognitionRef = useRef(false);
   const discardNextRecordingRef = useRef(false);
-  const nativePartialListenerRef = useRef<{ remove: () => Promise<void> } | null>(null);
-  const nativeListeningListenerRef = useRef<{ remove: () => Promise<void> } | null>(null);
+  const speechSessionRef = useRef<SpeechToTextSession | null>(null);
+  const stopInFlightRef = useRef(false);
+  const usingNativeSttRef = useRef(false);
 
   const webSpeechSupported = (): boolean => {
     const win = window as BrowserSpeechRecognitionWindow;
@@ -73,7 +103,6 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
   };
 
   const webSpeechReadyMessage = (): string | null => {
-    // Web Speech API requires a secure context, except for localhost.
     const isLocalhost =
       location.hostname === 'localhost' ||
       location.hostname === '127.0.0.1' ||
@@ -84,107 +113,62 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
     return null;
   };
 
+  const clearPreviewAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (previewAudioUrlRef.current) {
+      URL.revokeObjectURL(previewAudioUrlRef.current);
+      previewAudioUrlRef.current = null;
+    }
+    setIsPlaying(false);
+  };
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      void speechSessionRef.current?.stop().catch(() => undefined);
+      speechSessionRef.current = null;
       if (recognitionRef.current) {
         isStoppingRecognitionRef.current = true;
         recognitionRef.current.stop();
         recognitionRef.current = null;
       }
-      if (nativePartialListenerRef.current) {
-        void nativePartialListenerRef.current.remove().catch(() => undefined);
-        nativePartialListenerRef.current = null;
-      }
-      if (nativeListeningListenerRef.current) {
-        void nativeListeningListenerRef.current.remove().catch(() => undefined);
-        nativeListeningListenerRef.current = null;
-      }
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (previewAudioUrlRef.current) {
-        URL.revokeObjectURL(previewAudioUrlRef.current);
-        previewAudioUrlRef.current = null;
-      }
+      clearPreviewAudio();
     };
   }, []);
 
   useEffect(() => {
-    // Ensure stale preview state is not kept after the sheet closes.
     if (!isOpen) {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
+      clearPreviewAudio();
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
-      if (previewAudioUrlRef.current) {
-        URL.revokeObjectURL(previewAudioUrlRef.current);
-        previewAudioUrlRef.current = null;
-      }
-      setIsPlaying(false);
+      void speechSessionRef.current?.stop().catch(() => undefined);
+      speechSessionRef.current = null;
       setAudioBlob(null);
       setRecordingTime(0);
       setCaption('');
       setRecordingError('');
       setIsListening(false);
+      setLiveTranscript('');
       finalTranscriptRef.current = '';
       interimTranscriptRef.current = '';
       chunksRef.current = [];
+      stopInFlightRef.current = false;
+      usingNativeSttRef.current = false;
       setVoiceState('idle');
     }
   }, [isOpen]);
 
-  const startSpeechRecognition = () => {
-    setIsListening(false);
-    // Defensive: stop any prior session first to avoid overlap.
-    stopSpeechRecognition();
+  const getCombinedTranscript = () =>
+    normalizeRepeatedSpeech(
+      liveTranscript || `${finalTranscriptRef.current} ${interimTranscriptRef.current}`.trim()
+    );
 
-    if (Capacitor.isNativePlatform()) {
-      void (async () => {
-        try {
-          const available = await SpeechRecognition.available();
-          if (!available.available) {
-            setRecordingError('Speech-to-Text is not available on this device.');
-            return;
-          }
-
-          const perm = await SpeechRecognition.checkPermissions();
-          if (perm.speechRecognition !== 'granted') {
-            const requested = await SpeechRecognition.requestPermissions();
-            if (requested.speechRecognition !== 'granted') {
-              setRecordingError('Microphone/Speech permission denied.');
-              return;
-            }
-          }
-
-          finalTranscriptRef.current = '';
-          interimTranscriptRef.current = '';
-          isStoppingRecognitionRef.current = false;
-
-          nativePartialListenerRef.current = await SpeechRecognition.addListener('partialResults', (data) => {
-            const latest = data.matches?.[0]?.trim() ?? '';
-            if (!latest) return;
-            interimTranscriptRef.current = latest;
-          });
-
-          nativeListeningListenerRef.current = await SpeechRecognition.addListener('listeningState', (data) => {
-            setIsListening(data.status === 'started');
-          });
-
-          await SpeechRecognition.start({
-            language: 'en-US',
-            popup: false,
-            partialResults: true,
-            maxResults: 3,
-          });
-        } catch {
-          // Keep recording audio even if native speech recognition fails.
-        }
-      })();
-      return;
-    }
-
+  const startWebSpeechRecognition = () => {
     const notReady = webSpeechReadyMessage();
     if (notReady) {
       setRecordingError(notReady);
@@ -199,6 +183,7 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
     interimTranscriptRef.current = '';
     isStoppingRecognitionRef.current = false;
     setIsListening(true);
+    setLiveTranscript('');
 
     const recognition = new SpeechRecognitionCtor();
     recognition.lang = 'en-US';
@@ -216,11 +201,14 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
         }
       }
       interimTranscriptRef.current = interim.trim();
+      const combined = normalizeRepeatedSpeech(
+        `${finalTranscriptRef.current} ${interimTranscriptRef.current}`.trim()
+      );
+      setLiveTranscript(combined);
     };
 
     recognition.onerror = (event: Event) => {
-      // Keep recording audio even if browser speech recognition fails, but surface a helpful hint.
-      const maybeAny = event as unknown as { error?: string; message?: string };
+      const maybeAny = event as unknown as { error?: string };
       const code = (maybeAny?.error ?? '').toString();
       if (code === 'not-allowed' || code === 'service-not-allowed') {
         setRecordingError('Microphone permission denied for Speech-to-Text.');
@@ -228,9 +216,7 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
         setRecordingError('No microphone found or microphone is busy.');
       } else if (code === 'network') {
         setRecordingError('Speech-to-Text network error. Please try again.');
-      } else if (code === 'no-speech') {
-        // Common transient; do not hard-fail.
-      } else if (code) {
+      } else if (code && code !== 'no-speech') {
         setRecordingError(`Speech-to-Text error: ${code}`);
       }
     };
@@ -240,7 +226,7 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
         try {
           recognition.start();
         } catch {
-          // Ignore repeated start errors.
+          // ignore
         }
       } else {
         setIsListening(false);
@@ -253,26 +239,19 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
     } catch {
       recognitionRef.current = null;
       setIsListening(false);
+      setRecordingError('Could not start Speech-to-Text.');
     }
   };
 
-  const stopSpeechRecognition = () => {
+  const stopWebSpeechRecognition = () => {
     isStoppingRecognitionRef.current = true;
     setIsListening(false);
-    if (nativePartialListenerRef.current) {
-      void nativePartialListenerRef.current.remove().catch(() => undefined);
-      nativePartialListenerRef.current = null;
-    }
-    if (nativeListeningListenerRef.current) {
-      void nativeListeningListenerRef.current.remove().catch(() => undefined);
-      nativeListeningListenerRef.current = null;
-    }
-    if (Capacitor.isNativePlatform()) {
-      void SpeechRecognition.stop().catch(() => undefined);
-      return;
-    }
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
       recognitionRef.current = null;
     }
   };
@@ -280,55 +259,96 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
   const startRecording = async () => {
     try {
       setRecordingError('');
-      // New recording should always start from a clean preview state.
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (previewAudioUrlRef.current) {
-        URL.revokeObjectURL(previewAudioUrlRef.current);
-        previewAudioUrlRef.current = null;
-      }
-      setIsPlaying(false);
+      clearPreviewAudio();
       setAudioBlob(null);
       setCaption('');
+      setLiveTranscript('');
       finalTranscriptRef.current = '';
       interimTranscriptRef.current = '';
       discardNextRecordingRef.current = false;
+      stopInFlightRef.current = false;
+      usingNativeSttRef.current = false;
+
+      // Android/iOS: use shared on-device STT (no MediaRecorder mic conflict).
+      if (Capacitor.isNativePlatform()) {
+        usingNativeSttRef.current = true;
+        setVoiceState('recording');
+        setRecordingTime(0);
+        setIsListening(false);
+
+        // Wait until STT is actually running before starting the timer.
+        const session = await startSpeechToText({
+          language: 'en-US',
+          languageFallbacks: ['fil-PH'],
+          // Android ends after silence — keep listening for Chat phrases.
+          restartOnEnd: true,
+          onChunk: (chunk) => {
+            const text = normalizeRepeatedSpeech(chunk.text);
+            if (!text) return;
+            interimTranscriptRef.current = text;
+            finalTranscriptRef.current = text;
+            setLiveTranscript(text);
+            setIsListening(true);
+          },
+          onError: (message) => {
+            setRecordingError(message);
+            setIsListening(false);
+          },
+        });
+        if (discardNextRecordingRef.current) {
+          await session.stop().catch(() => undefined);
+          return;
+        }
+        speechSessionRef.current = session;
+        setIsListening(true);
+
+        timerRef.current = setInterval(() => {
+          setRecordingTime((prev) => {
+            if (prev >= 60) {
+              window.setTimeout(() => stopRecording(), 0);
+              return prev;
+            }
+            return prev + 1;
+          });
+        }, 1000);
+        return;
+      }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (typeof MediaRecorder === 'undefined') {
         throw new Error('Audio recording is not supported on this device.');
       }
-      const mediaRecorder = new MediaRecorder(stream);
+      const pickedMimeType = pickMediaRecorderMimeType();
+      const mediaRecorder = pickedMimeType
+        ? new MediaRecorder(stream, { mimeType: pickedMimeType })
+        : new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
+        if (e.data.size > 0) chunksRef.current.push(e.data);
       };
 
       mediaRecorder.onstop = () => {
         if (!discardNextRecordingRef.current) {
-          const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+          const blobType = mediaRecorder.mimeType || pickedMimeType || 'audio/webm';
+          const blob = new Blob(chunksRef.current, { type: blobType });
           setAudioBlob(blob);
           setVoiceState('preview');
         }
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
         discardNextRecordingRef.current = false;
       };
 
       mediaRecorder.start();
       setVoiceState('recording');
       setRecordingTime(0);
-      startSpeechRecognition();
+      startWebSpeechRecognition();
 
       timerRef.current = setInterval(() => {
-        setRecordingTime(prev => {
+        setRecordingTime((prev) => {
           if (prev >= 60) {
-            stopRecording();
+            window.setTimeout(() => stopRecording(), 0);
             return prev;
           }
           return prev + 1;
@@ -340,37 +360,72 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
           ? error.message
           : 'Unable to start recording. Check microphone permission.';
       setRecordingError(message);
+      setVoiceState('idle');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-    stopSpeechRecognition();
+    if (stopInFlightRef.current) return;
+    stopInFlightRef.current = true;
+
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+
+    if (usingNativeSttRef.current) {
+      const session = speechSessionRef.current;
+      speechSessionRef.current = null;
+      // Prefer refs — React state can be stale inside this handler.
+      const snapshot =
+        interimTranscriptRef.current || finalTranscriptRef.current || liveTranscript;
+
+      void (async () => {
+        try {
+          const stoppedText = await session?.stop();
+          const text = normalizeRepeatedSpeech(
+            stoppedText || session?.getTranscript() || snapshot
+          );
+          if (!discardNextRecordingRef.current) {
+            setLiveTranscript(text);
+            finalTranscriptRef.current = text;
+            interimTranscriptRef.current = '';
+            setVoiceState('preview');
+          }
+        } catch {
+          if (!discardNextRecordingRef.current) {
+            const fallback = normalizeRepeatedSpeech(snapshot);
+            setLiveTranscript(fallback);
+            finalTranscriptRef.current = fallback;
+            setVoiceState('preview');
+          }
+        } finally {
+          setIsListening(false);
+          stopInFlightRef.current = false;
+        }
+      })();
+      return;
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+    stopWebSpeechRecognition();
+    stopInFlightRef.current = false;
   };
 
   const cancelRecording = () => {
     discardNextRecordingRef.current = true;
     stopRecording();
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (previewAudioUrlRef.current) {
-      URL.revokeObjectURL(previewAudioUrlRef.current);
-      previewAudioUrlRef.current = null;
-    }
-    setIsPlaying(false);
+    clearPreviewAudio();
+    void speechSessionRef.current?.stop().catch(() => undefined);
+    speechSessionRef.current = null;
     setAudioBlob(null);
     setRecordingTime(0);
     setCaption('');
     setRecordingError('');
     setIsListening(false);
+    setLiveTranscript('');
     finalTranscriptRef.current = '';
     interimTranscriptRef.current = '';
     setVoiceState('idle');
@@ -378,27 +433,20 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
   };
 
   const deleteRecording = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    if (previewAudioUrlRef.current) {
-      URL.revokeObjectURL(previewAudioUrlRef.current);
-      previewAudioUrlRef.current = null;
-    }
-    setIsPlaying(false);
+    clearPreviewAudio();
     setAudioBlob(null);
     setRecordingTime(0);
     setCaption('');
     setRecordingError('');
     setIsListening(false);
+    setLiveTranscript('');
     finalTranscriptRef.current = '';
     interimTranscriptRef.current = '';
     setVoiceState('idle');
   };
 
   const playPreview = () => {
-    if (!audioBlob) return;
+    if (!audioBlob || audioBlob.size === 0) return;
 
     if (!audioRef.current) {
       if (previewAudioUrlRef.current) {
@@ -419,13 +467,15 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
   };
 
   const sendVoice = () => {
-    if (audioBlob) {
-      const transcript =
-        `${finalTranscriptRef.current} ${interimTranscriptRef.current}`.replace(/\s+/g, ' ').trim();
-      onSendVoice(audioBlob, caption, transcript, recordingTime);
-      deleteRecording();
-      onClose();
+    const transcript = getCombinedTranscript();
+    const hasAudio = Boolean(audioBlob && audioBlob.size > 0);
+    if (!hasAudio && !transcript) {
+      setRecordingError('No speech detected. Please try again and speak clearly.');
+      return;
     }
+    onSendVoice(audioBlob ?? new Blob([], { type: 'audio/wav' }), caption, transcript, recordingTime);
+    deleteRecording();
+    onClose();
   };
 
   const formatTime = (seconds: number) => {
@@ -452,9 +502,9 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
             <div className="voice-body voice-body--idle">
               {recordingError ? <p className="voice-hint">{recordingError}</p> : null}
               <div className="voice-mic-container">
-                <button 
-                  className="voice-mic-btn" 
-                  onClick={startRecording}
+                <button
+                  className="voice-mic-btn"
+                  onClick={() => void startRecording()}
                   aria-label="Start recording"
                 >
                   <IonIcon icon={micOutline} className="voice-mic-icon" />
@@ -477,8 +527,13 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
                 <span className="voice-recording-text">RECORDING</span>
               </div>
               <p className="voice-hint" aria-live="polite">
-                {isListening ? 'Listening…' : 'Starting Speech-to-Text…'}
+                {liveTranscript
+                  ? liveTranscript
+                  : isListening
+                    ? 'Listening… speak now'
+                    : 'Starting Speech-to-Text…'}
               </p>
+              {recordingError ? <p className="voice-hint">{recordingError}</p> : null}
               <div className="voice-timer">
                 <span className="voice-timer-value">{formatTime(recordingTime)}</span>
               </div>
@@ -521,18 +576,25 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
                   <IonIcon icon={volumeHighOutline} />
                 </div>
                 <div className="voice-preview-info">
-                  <span className="voice-preview-label">Voice Message</span>
+                  <span className="voice-preview-label">
+                    {audioBlob && audioBlob.size > 0 ? 'Voice Message' : 'Speech Capture'}
+                  </span>
                   <span className="voice-preview-duration">{formatTime(recordingTime)}</span>
                 </div>
-                <button className="voice-play-btn" onClick={playPreview}>
-                  <IonIcon icon={isPlaying ? pauseOutline : playOutline} />
-                </button>
+                {audioBlob && audioBlob.size > 0 ? (
+                  <button className="voice-play-btn" onClick={playPreview}>
+                    <IonIcon icon={isPlaying ? pauseOutline : playOutline} />
+                  </button>
+                ) : null}
               </div>
-              {(`${finalTranscriptRef.current} ${interimTranscriptRef.current}`.replace(/\s+/g, ' ').trim()) ? (
+              {getCombinedTranscript() ? (
                 <p className="voice-hint" aria-label="Detected speech">
-                  {(`${finalTranscriptRef.current} ${interimTranscriptRef.current}`.replace(/\s+/g, ' ').trim())}
+                  {getCombinedTranscript()}
                 </p>
-              ) : null}
+              ) : (
+                <p className="voice-hint">No speech detected yet. Delete and try again if needed.</p>
+              )}
+              {recordingError ? <p className="voice-hint">{recordingError}</p> : null}
               <div className="voice-caption-field">
                 <label className="voice-caption-label">Add caption (optional):</label>
                 <input

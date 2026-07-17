@@ -1270,6 +1270,81 @@
   margin-left: 1px;
 }
 
+/* ===== Word of the Day card ===== */
+.home-wod {
+  margin-bottom: 28px;
+}
+
+.home-wod__card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 18px;
+  border: none;
+  border-radius: var(--home-radius-lg);
+  color: #ffffff;
+  box-shadow: 0 8px 24px -4px rgba(0, 71, 171, 0.25), 0 12px 28px -6px rgba(124, 58, 237, 0.2);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: box-shadow 0.2s, transform 0.12s;
+}
+
+.home-wod__card:active {
+  box-shadow: 0 4px 16px -2px rgba(0, 71, 171, 0.2);
+  transform: scale(0.99);
+}
+
+.home-wod__icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.home-wod__icon {
+  width: 22px;
+  height: 22px;
+  color: #ffffff;
+}
+
+.home-wod__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-wod__label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin: 0 0 3px;
+  letter-spacing: 0.01em;
+}
+
+.home-wod__value {
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin: 0;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-wod__cta {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.22);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* ===== Day Streak section wrapper ===== */
 .home-streak {
   margin-bottom: 28px;

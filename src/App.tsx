@@ -8,9 +8,6 @@ import Home from './pages/Home';
 import LoginPage from './pages/Login';
 import WelcomeSlide1 from './pages/WelcomeSlide1';
 import WelcomeSlide2 from './pages/WelcomeSlide2';
-import Learn from './pages/Learn';
-import DialectDetail from './pages/DialectDetail';
-import Quiz from './pages/Quiz';
 import Chat from './pages/Chat';
 import Profile from './pages/Profile';
 import CulturalIntroSlide from './pages/CulturalIntroSlide';
@@ -102,15 +99,7 @@ const App: React.FC = () => (
         <ProtectedRoute exact path="/home">
           <Home />
         </ProtectedRoute>
-        <ProtectedRoute exact path="/learn">
-          <Learn />
-        </ProtectedRoute>
-        <ProtectedRoute exact path="/learn/:dialectId">
-          <DialectDetail />
-        </ProtectedRoute>
-        <ProtectedRoute exact path="/quiz">
-          <Quiz />
-        </ProtectedRoute>
+
         <ProtectedRoute exact path="/chat">
           <Chat />
         </ProtectedRoute>
