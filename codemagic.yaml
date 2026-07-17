@@ -1,12 +1,9 @@
 workflows:
   salintayo-ios-workflow:
-    name: Salintayo iOS Device IPA
+    name: Salintayo iOS Workflow (unsigned)
     max_build_duration: 120
     instance_type: mac_mini_m2
     environment:
-      ios_signing:
-        distribution_type: ad_hoc
-        bundle_identifier: io.ionic.starter
       vars:
         XCODE_PROJECT: "App.xcodeproj"
         XCODE_SCHEME: "App"
@@ -33,17 +30,19 @@ workflows:
             npx cap add ios --packagemanager SPM
           fi
           npx cap sync ios
-      - name: Set up code signing settings on Xcode project
-        script: |
-          xcode-project use-profiles
-      - name: Build signed IPA for device
+      - name: Build unsigned iOS simulator app
         script: |
           cd $CM_BUILD_DIR/ios/App
-          xcode-project build-ipa \
-            --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
     artifacts:
-      - ios/App/build/ios/ipa/*.ipa
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
       - /tmp/xcodebuild_logs/*.log
     publishing:
       email:
