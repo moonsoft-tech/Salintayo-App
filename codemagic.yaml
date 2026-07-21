@@ -51,3 +51,58 @@ workflows:
         notify:
           success: true
           failure: true
+
+  salintayo-ios-device-workflow:
+    name: Salintayo iOS Device Workflow (unsigned)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      vars:
+        XCODE_PROJECT: "App.xcodeproj"
+        XCODE_SCHEME: "App"
+      node: 22
+      xcode: latest
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: NewUpdate3
+          include: true
+    scripts:
+      - name: Install npm dependencies
+        script: |
+          npm ci
+      - name: Build web bundle
+        script: |
+          npm run build
+      - name: Add and sync Capacitor iOS project
+        script: |
+          if [ ! -d ios ]; then
+            npx cap add ios --packagemanager SPM
+          fi
+          npx cap sync ios
+      - name: Build unsigned iOS device app
+        script: |
+          cd $CM_BUILD_DIR/ios/App
+          xcodebuild build \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+    artifacts:
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      email:
+        recipients:
+          - moonsoft2.0@gmail.com
+        notify:
+          success: true
+          failure: true
