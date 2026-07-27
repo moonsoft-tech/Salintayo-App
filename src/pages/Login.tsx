@@ -5,8 +5,10 @@ import {
   setPersistence,
   browserLocalPersistence,
   indexedDBLocalPersistence,
+  signInAnonymously,
 } from 'firebase/auth';
-import { IonSpinner } from '@ionic/react';
+import { IonSpinner, IonIcon } from '@ionic/react';
+import { personCircleOutline } from 'ionicons/icons';
 import { Capacitor } from '@capacitor/core';
 import { firebaseAuth } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
@@ -137,6 +139,27 @@ export default function LoginPage() {
     }
   };
 
+  const handleGuestLogin = async () => {
+    setError('');
+    setLoading(true);
+
+    try {
+      await ensureRedirectPersistence();
+      const credential = await signInAnonymously(firebaseAuth);
+      if (credential.user) {
+        navigateAfterLogin(credential.user.uid, history);
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Could not continue without Google sign-in. Please try again.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div
       className={`login-page${loading ? ' login-page--busy' : ''}`}
@@ -190,6 +213,16 @@ export default function LoginPage() {
           >
             <img src={imgGoogleIcon} alt="" className="login-btn__google-icon" />
             {loading ? 'Signing in…' : 'Continue with Google'}
+          </button>
+
+          <button
+            type="button"
+            className="login-btn--guest"
+            onClick={handleGuestLogin}
+            disabled={loading}
+          >
+            <IonIcon icon={personCircleOutline} className="login-btn__guest-icon" aria-hidden="true" />
+            {loading ? 'Signing in…' : 'Continue as Guest'}
           </button>
 
           <p className="login-privacy">

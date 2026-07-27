@@ -23,6 +23,18 @@ const FUNCTIONS_BASE = resolveFunctionsBaseUrl();
 /**
  * Call a public Cloud Function (no auth required).
  */
+function formatFunctionsHttpError(status: number, data: Record<string, unknown>): string {
+  const detail = (data.message || data.error || data.detail || '').toString().trim();
+  if (status === 404 || /page not found/i.test(detail)) {
+    return (
+      'Voice transcription service is not deployed yet. ' +
+      'Deploy Firebase function "transcribeWhisper" (Blaze plan + OPENAI_API_KEY), ' +
+      'or use on-device Speech-to-Text.'
+    );
+  }
+  return detail || `Request failed (${status})`;
+}
+
 async function callPublicApi<T = unknown>(
   functionName: string,
   options: Omit<RequestInit, 'body'> & { body?: unknown } = {}
@@ -33,15 +45,26 @@ async function callPublicApi<T = unknown>(
   const url = `${FUNCTIONS_BASE}/${functionName}`;
   const { body, ...rest } = options;
   const resolvedBody = body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body);
-  const res = await fetch(url, {
-    ...rest,
-    method: rest.method || 'POST',
-    headers: { 'Content-Type': 'application/json', ...(rest.headers as Record<string, string>) },
-    body: resolvedBody,
-  });
-  const data = await res.json().catch(() => ({ error: res.statusText }));
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...rest,
+      method: rest.method || 'POST',
+      headers: { 'Content-Type': 'application/json', ...(rest.headers as Record<string, string>) },
+      body: resolvedBody,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg === 'Failed to fetch' || msg.includes('Load failed') || msg.includes('NetworkError')) {
+      throw new Error(
+        'Cannot reach Cloud Functions (network or CORS). Deploy "transcribeWhisper", check VITE_FUNCTIONS_URL, or use on-device Speech-to-Text.'
+      );
+    }
+    throw e;
+  }
+  const data = (await res.json().catch(() => ({ error: res.statusText }))) as Record<string, unknown>;
   if (!res.ok) {
-    throw new Error(data.message || data.error || 'Request failed');
+    throw new Error(formatFunctionsHttpError(res.status, data));
   }
   return data as T;
 }
@@ -179,6 +202,12 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
+/** Strip codec params so backends accept "audio/webm;codecs=opus" as "audio/webm". */
+function normalizeAudioMime(mimeType: string | undefined): string {
+  const raw = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
+  return raw || 'audio/webm';
+}
+
 const LOGIC_URL = (import.meta.env.VITE_LOGIC_URL || '').trim().replace(/\/+$/, '');
 const LOGIC_API_KEY = import.meta.env.VITE_LOGIC_API_KEY || '';
 
@@ -200,7 +229,7 @@ async function transcribeWhisperDirectLogic(
     },
     body: JSON.stringify({
       audio_base64: audioBase64,
-      mime_type: audioBlob.type || 'audio/webm',
+      mime_type: normalizeAudioMime(audioBlob.type),
       whisper_model: whisperModel,
     }),
   });
@@ -213,15 +242,22 @@ async function transcribeWhisperDirectLogic(
   return data as { text: string };
 }
 
+/**
+ * Whisper via Cloud Functions.
+ * Server endpoint is public (rate-limited); do not require Firebase Auth.
+ */
 async function transcribeWhisperViaFunctions(audioBlob: Blob, whisperModel?: string): Promise<{ text: string }> {
+  if (!audioBlob.size) {
+    throw new Error('No audio to transcribe.');
+  }
   const audioBase64 = await blobToBase64(audioBlob);
-  return callProtectedApi<{ text: string }>('transcribeWhisper', {
+  return callPublicApi<{ text: string }>('transcribeWhisper', {
     method: 'POST',
-    body: JSON.stringify({
+    body: {
       audio_base64: audioBase64,
-      mime_type: audioBlob.type || 'audio/webm',
+      mime_type: normalizeAudioMime(audioBlob.type),
       whisper_model: whisperModel,
-    }),
+    },
   });
 }
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useHistory, useLocation } from 'react-router-dom';
 import { IonContent,
-  IonFooter, IonIcon, IonPage, useIonViewDidEnter } from '@ionic/react';
+  IonFooter, IonIcon, IonPage, IonRouterLink, useIonViewDidEnter } from '@ionic/react';
 import { useIonContentScrollTopOnEnter } from '../utils/useIonContentScrollTopOnEnter';
 import {
   personCircleOutline,
@@ -22,7 +22,6 @@ import {
 import './Profile.css';
 import './LanguageModal.css';
 
-import NotifModal from './NotifModal';
 import EditProfileModal from './EditProfileModal';
 import LanguageModal, { Language, LANGUAGES } from './LanguageModal';
 import { getDefaultDialectCodeForExperience, getResolvedDialectLangCode } from '../utils/dialectPreference';
@@ -48,29 +47,6 @@ function learningTierFromProgress(p: number): string {
   return 'Expert';
 }
 
-/** Calculate total quiz attempts across all dialects */
-function getTotalQuizAttempts(): number {
-  const QUIZ_ATTEMPTS_KEY = 'salintayo_quiz_attempts';
-  const dialects = ['fil', 'ceb', 'ilo', 'hil', 'pag', 'war', 'bik', 'pam', 'tsg'];
-  let total = 0;
-  
-  try {
-    for (const dialect of dialects) {
-      const raw = localStorage.getItem(`${QUIZ_ATTEMPTS_KEY}_${dialect}`);
-      if (raw) {
-        const attempts = JSON.parse(raw);
-        if (Array.isArray(attempts)) {
-          total += attempts.length;
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('Error calculating quiz attempts:', e);
-  }
-  
-  return total;
-}
-
 const ProfilePage: React.FC = () => {
   const history = useHistory();
   const location = useLocation();
@@ -94,7 +70,6 @@ const ProfilePage: React.FC = () => {
     }
   });
 
-  const [showNotifModal, setShowNotifModal]           = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal]     = useState(false);
   const [showHelpModal, setShowHelpModal]             = useState(false);
@@ -174,10 +149,9 @@ const ProfilePage: React.FC = () => {
       return v === 'tourist' || v === 'local' ? v : null;
     } catch { return null; }
   });
-  
+
   // Stats
   const [streak, setStreak] = useState(0);
-  const [lessons, setLessons] = useState(0);
   const [progress, setProgress] = useState(0);
 
   const loadProfile = async () => {
@@ -206,7 +180,6 @@ const ProfilePage: React.FC = () => {
         streakFromDb !== null ? streakFromDb : computeCurrentLoginStreakFromDates(new Set(mergedActivity))
       );
 
-      setLessons(getTotalQuizAttempts());
       setProgress(
         typeof data?.progress === 'number' && Number.isFinite(data.progress)
           ? Math.min(100, Math.max(0, data.progress))
@@ -388,38 +361,6 @@ const ProfilePage: React.FC = () => {
               <div className="stat-value streak">{streak} 🔥</div>
               <div className="stat-label">Day Streak</div>
             </div>
-            <div className="stat-item">
-              <div className="stat-value lessons">{lessons}</div>
-              <div className="stat-label">Quiz Taken</div>
-            </div>
-          </div>
-
-          {/* ═══ PROGRESS CARD ═══ */}
-          <div className="card">
-            <div className="card-head">
-              <span className="card-icon blue">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="20" x2="18" y2="10"/>
-                  <line x1="12" y1="20" x2="12" y2="4"/>
-                  <line x1="6" y1="20" x2="6" y2="14"/>
-                </svg>
-              </span>
-              <span className="card-title">Progress Overview</span>
-            </div>
-            <div className="card-body">
-              <div className="progress-labels">
-                <span>Newbie</span>
-                <span>Expert</span>
-              </div>
-              <div className="progress-track">
-                <div className="progress-fill" id="prog-fill" style={{ width: `${progress}%` }}></div>
-              </div>
-              <div className="progress-current">
-                {progress <= 0
-                  ? 'Start on Learn to track progress from Newbie to Expert.'
-                  : `${learningTierFromProgress(progress)} — ${progress}% toward Expert`}
-              </div>
-            </div>
           </div>
 
           {/* ═══ BIO CARD ═══ */}
@@ -587,28 +528,6 @@ const ProfilePage: React.FC = () => {
               </li>
 
               <li>
-                <button className="settings-item" onClick={() => setShowNotifModal(true)}>
-                  <div className="settings-item-left">
-                    <span className="settings-item-icon teal">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 8h1a4 4 0 0 1 0 8h-1"/>
-                        <path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/>
-                        <line x1="6" y1="1" x2="6" y2="4"/>
-                        <line x1="10" y1="1" x2="10" y2="4"/>
-                        <line x1="14" y1="1" x2="14" y2="4"/>
-                      </svg>
-                    </span>
-                    <span className="settings-item-label">Notification Preferences</span>
-                  </div>
-                  <span className="settings-chevron">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="9 18 15 12 9 6"/>
-                    </svg>
-                  </span>
-                </button>
-              </li>
-
-              <li>
                 <button className="settings-item" onClick={() => setShowHelpModal(true)}>
                   <div className="settings-item-left">
                     <span className="settings-item-icon orange">
@@ -713,10 +632,6 @@ const ProfilePage: React.FC = () => {
         </div>
 
         {/* Modals */}
-        <NotifModal
-          isOpen={showNotifModal}
-          onClose={() => setShowNotifModal(false)}
-        />
         <EditProfileModal
           isOpen={showEditProfileModal}
           onClose={() => setShowEditProfileModal(false)}
@@ -752,26 +667,18 @@ const ProfilePage: React.FC = () => {
 
       <IonFooter className="profile-footer ion-no-border">
           <nav className="profile-nav" aria-label="Main">
-            <Link to="/learn" className="profile-nav__item">
-              <IonIcon icon={bookOutline} className="profile-nav__icon" />
-              <span className="profile-nav__label">Learn</span>
-            </Link>
-            <Link to="/quiz" className="profile-nav__item">
-              <IonIcon icon={documentTextOutline} className="profile-nav__icon" />
-              <span className="profile-nav__label">Quiz</span>
-            </Link>
-            <Link to="/home" className="profile-nav__item">
+            <IonRouterLink routerLink="/home" routerDirection="root" className="profile-nav__item">
               <IonIcon icon={homeOutline} className="profile-nav__icon" />
               <span className="profile-nav__label">Home</span>
-            </Link>
-            <Link to="/chat" className={`profile-nav__item ${location.pathname === '/chat' ? 'profile-nav__item--active' : ''}`}>
+            </IonRouterLink>
+            <IonRouterLink routerLink="/chat" routerDirection="root" className={`profile-nav__item ${location.pathname === '/chat' ? 'profile-nav__item--active' : ''}`}>
               <IonIcon icon={chatbubbleOutline} className="profile-nav__icon" />
               <span className="profile-nav__label">Chat</span>
-            </Link>
-            <Link to="/profile" className={`profile-nav__item ${isProfile ? 'profile-nav__item--active' : ''}`}>
+            </IonRouterLink>
+            <IonRouterLink routerLink="/profile" routerDirection="root" className={`profile-nav__item ${isProfile ? 'profile-nav__item--active' : ''}`}>
               <IonIcon icon={personOutline} className="profile-nav__icon" />
               <span className="profile-nav__label">Profile</span>
-            </Link>
+            </IonRouterLink>
           </nav>
         </IonFooter>
     </IonPage>

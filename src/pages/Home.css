@@ -1270,6 +1270,81 @@
   margin-left: 1px;
 }
 
+/* ===== Word of the Day card ===== */
+.home-wod {
+  margin-bottom: 28px;
+}
+
+.home-wod__card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 18px;
+  border: none;
+  border-radius: var(--home-radius-lg);
+  color: #ffffff;
+  box-shadow: 0 8px 24px -4px rgba(0, 71, 171, 0.25), 0 12px 28px -6px rgba(124, 58, 237, 0.2);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: box-shadow 0.2s, transform 0.12s;
+}
+
+.home-wod__card:active {
+  box-shadow: 0 4px 16px -2px rgba(0, 71, 171, 0.2);
+  transform: scale(0.99);
+}
+
+.home-wod__icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.home-wod__icon {
+  width: 22px;
+  height: 22px;
+  color: #ffffff;
+}
+
+.home-wod__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-wod__label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  margin: 0 0 3px;
+  letter-spacing: 0.01em;
+}
+
+.home-wod__value {
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin: 0;
+  opacity: 0.95;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-wod__cta {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.22);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* ===== Day Streak section wrapper ===== */
 .home-streak {
   margin-bottom: 28px;
@@ -1791,8 +1866,22 @@
   font-size: 1rem;
   font-weight: 600;
   color: var(--home-text);
-  margin: 0 0 14px;
+  margin: 0;
   line-height: 1.3;
+}
+
+.home-recommendations__header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.home-recommendations__subtitle {
+  font-size: 0.85rem;
+  color: var(--home-text-muted);
+  margin: 0;
+  line-height: 1.4;
 }
 
 .home-recommendations__list {
@@ -1808,21 +1897,25 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255, 255, 255, 0.92);
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 20px;
   border: 1px solid rgba(124, 58, 237, 0.12);
-  padding: 12px 18px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  background: rgba(255, 255, 255, 0.96);
   color: var(--home-text);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   border-left: 4px solid #7c3aed;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
 }
 
-.home-recommendations__item:hover {
+.home-recommendations__item:hover,
+.home-recommendations__item:focus-visible {
   transform: translateY(-1px);
   box-shadow: 0 14px 30px rgba(15, 23, 42, 0.09);
+  outline: none;
 }
 
 .home-recommendations__item:active {
@@ -1830,10 +1923,32 @@
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
 }
 
+.home-recommendations__item {
+  appearance: none;
+}
+
 .home-recommendations__icon {
   flex-shrink: 0;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   line-height: 1;
+}
+
+.home-recommendations__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.home-recommendations__label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--home-text);
+}
+
+.home-recommendations__meta {
+  font-size: 0.8rem;
+  color: var(--home-text-muted);
 }
 
 /* ===== Spacer for fixed footer ===== */

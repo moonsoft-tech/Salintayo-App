@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { Link, useHistory, useLocation } from 'react-router-dom';
-import { IonContent, IonIcon, IonPage, useIonViewWillEnter } from '@ionic/react';
+import { IonContent, IonIcon, IonPage, IonRouterLink, useIonViewWillEnter } from '@ionic/react';
 import {
   personCircleOutline,
   personOutline,
@@ -9,31 +9,19 @@ import {
   documentTextOutline,
   homeOutline,
   chatbubbleOutline,
+  micOutline,
+  checkmarkCircle,
 } from 'ionicons/icons';
 import './Home.css';
 import { useAuth } from '../contexts/AuthContext';
 import { firebaseDb } from '../firebase';
-import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { LANGUAGES, type Language } from './LanguageModal';
 import { getResolvedDialectLangCode } from '../utils/dialectPreference';
 import CardDetailModal from './CardDetailModal';
-import {
-  LEARN_ACTIVITY_DATES_KEY,
-  LEARN_STREAK_CHANGED_EVENT,
-  LOGIN_ACTIVITY_DATES_KEY,
-  LOGIN_STREAK_CHANGED_EVENT,
-  buildLoginStreakWeekRow,
-  computeCurrentLoginStreakFromDates,
-  mergeActivityDateStrings,
-  phDateKey,
-  readLocalLoginDates,
-} from '../utils/learnStreak';
-import {
-  LOGIN_STREAK_SYNCED_EVENT,
-  type LoginStreakSyncEventDetail,
-  syncLoginStreakOnAuth,
-} from '../utils/loginStreakFirestore';
+import WordOfDayModal from './WordOfDayModal';
+import { phDateKey } from '../utils/learnStreak';
 import {
   QUIZ_PROGRESS_UPDATED_EVENT,
   computeLearningLevel,
@@ -309,81 +297,6 @@ const SlideToast: React.FC<ToastProps> = ({ data, onDismiss }) => {
   );
 };
 
-/* ── Fire Lighting Overlay ── */
-interface FireOverlayProps {
-  isOpen: boolean;
-  streakCount: number;
-  streakWeek: { label: string; state: string }[];
-  displayName: string;
-  onConfirm: () => void;
-  onClose: () => void;
-}
-
-const FireOverlay: React.FC<FireOverlayProps> = ({
-  isOpen,
-  streakCount,
-  streakWeek,
-  displayName,
-  onConfirm,
-  onClose,
-}) => {
-  const [animIn, setAnimIn] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      requestAnimationFrame(() => setAnimIn(true));
-    } else {
-      setAnimIn(false);
-    }
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  return ReactDOM.createPortal(
-    <div
-      className={`home-fire-overlay${animIn ? ' home-fire-overlay--in' : ''}`}
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Streak celebration"
-    >
-      <div
-        className="home-fire-modal"
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="home-fire-emoji-wrap">
-          <div className={`home-fire-bg-circle${animIn ? ' home-fire-bg-circle--explode' : ''}`} />
-          <span className={`home-fire-emoji${animIn ? ' home-fire-emoji--pop' : ''}`}>🔥</span>
-        </div>
-
-        <h3 className="home-fire-title">Streak lit! 🎉</h3>
-        <p className="home-fire-sub">
-          {streakCount} Day Streak — keep it up, {displayName}!
-        </p>
-
-        <div className="home-fire-day-row" aria-label="Weekly streak progress">
-          {streakWeek.map((d, i) => (
-            <div
-              key={`${d.label}-${i}`}
-              className={[
-                'home-fire-day-pip',
-                d.state === 'completed' ? 'home-fire-day-pip--lit' : '',
-                d.state === 'today' ? 'home-fire-day-pip--today' : '',
-              ].filter(Boolean).join(' ')}
-            >
-              {d.label}
-            </div>
-          ))}
-        </div>
-
-        <button className="home-fire-dismiss-btn" onClick={onConfirm}>
-          Awesome!
-        </button>
-      </div>
-    </div>,
-    document.body
-  );
-};
 
 const HomePage: React.FC = () => {
   const location = useLocation();
@@ -400,6 +313,9 @@ const HomePage: React.FC = () => {
   const [activeLanguageCode, setActiveLanguageCode] = useState(readDialectCodeFromStorage);
   const [selectedCard, setSelectedCard] = useState<(typeof culturalCards)[number] | null>(null);
   const [cardModalOpen, setCardModalOpen] = useState(false);
+  const [wodModalOpen, setWodModalOpen] = useState(false);
+  const [wodTodayScore, setWodTodayScore] = useState<number | null>(null);
+  const [wodStatusLoading, setWodStatusLoading] = useState(true);
   const [toast, setToast] = useState<ToastData | null>(null);
   const cultureCarouselTrackRef = useRef<HTMLDivElement>(null);
   const [carouselIndex, setCarouselIndex] = useState(0);
@@ -408,15 +324,6 @@ const HomePage: React.FC = () => {
   const homeContentRef = useRef<HTMLIonContentElement>(null);
   const quizHistoryFirestoreRef = useRef<QuizAttemptRecord[]>([]);
 
-  /* ── Streak state ── */
-  const [todayStreakLit, setTodayStreakLit] = useState(false);
-  const [showFireOverlay, setShowFireOverlay] = useState(false);
-
-  /* Check whether today is already recorded in login dates */
-  useEffect(() => {
-    const today = phDateKey();
-    setTodayStreakLit(loginActivityDateKeys.includes(today));
-  }, [loginActivityDateKeys]);
 
   const syncFluencyLanguageLabel = useCallback(() => {
     setFluencyLanguageName(getPreferredLanguageDisplayName());
@@ -431,31 +338,22 @@ const HomePage: React.FC = () => {
       const snap = await getDoc(doc(firebaseDb, 'users', user.uid));
       const data = snap.exists() ? snap.data() : null;
 
-      const rawDates = data?.loginActivityDates;
-      const fireDates = Array.isArray(rawDates)
-        ? rawDates.filter((x): x is string => typeof x === 'string')
-        : undefined;
-      const merged = mergeActivityDateStrings(readLocalLoginDates(), fireDates);
-      try {
-        localStorage.setItem(LOGIN_ACTIVITY_DATES_KEY, JSON.stringify(merged));
-      } catch { /* ignore */ }
-      setLoginActivityDateKeys(merged);
-
-      const streakFromDb =
-        typeof data?.streakCount === 'number' && Number.isFinite(data.streakCount)
-          ? Math.floor(data.streakCount)
-          : typeof data?.loginStreak === 'number' && Number.isFinite(data.loginStreak)
-            ? Math.floor(data.loginStreak)
-            : null;
-      const computed = computeCurrentLoginStreakFromDates(new Set(merged));
-      setLearnStreakCount(streakFromDb !== null ? streakFromDb : computed);
-
-      if (data) {
+      if (data) { 
         if (typeof data.displayName === 'string' && data.displayName.trim()) {
           setDisplayName(data.displayName);
         }
         if (typeof data.photoBase64 === 'string' && data.photoBase64.trim()) {
           setPhotoSrc(data.photoBase64);
+        }
+        // Firestore-saved dialect preference takes precedence so it follows
+        // the account across devices; falls back to local storage otherwise.
+        if (typeof data.activeDialect === 'string' && data.activeDialect.trim()) {
+          const savedDialect = data.activeDialect.trim().toLowerCase();
+          setActiveLanguageCode(savedDialect);
+          try {
+            localStorage.setItem(DIALECT_LANG_KEY, savedDialect);
+            localStorage.setItem(QCB_LANG_KEY, savedDialect);
+          } catch { /* ignore */ }
         }
       }
     } catch (e) {
@@ -602,6 +500,10 @@ const HomePage: React.FC = () => {
       window.dispatchEvent(new Event('salintayo_lang_changed'));
       window.dispatchEvent(new Event('salintayo_qcb_lang_changed'));
     } catch { /* ignore */ }
+    if (user?.uid) {
+      void setDoc(doc(firebaseDb, 'users', user.uid), { activeDialect: lang.code }, { merge: true })
+        .catch((e) => console.warn('Failed to save dialect preference to Firestore:', e));
+    }
     setToast({
       message: `Dialect switched to ${lang.name}`,
       sub: `${lang.native} · ${lang.region}`,
@@ -610,47 +512,6 @@ const HomePage: React.FC = () => {
     });
   }, []);
 
-  /* Handle streak fire overlay confirm */
-  const handleFireConfirm = useCallback(async () => {
-    setShowFireOverlay(false);
-    setTodayStreakLit(true);
-    if (user) {
-      try {
-        const r = await syncLoginStreakOnAuth(user.uid);
-        setLearnStreakCount(r.streakCount);
-        setLoginActivityDateKeys(r.loginActivityDates);
-        try {
-          localStorage.setItem(LOGIN_ACTIVITY_DATES_KEY, JSON.stringify(r.loginActivityDates));
-        } catch {
-          /* ignore */
-        }
-      } catch (e) {
-        console.error('Streak sync on confirm failed:', e);
-      }
-    }
-    window.dispatchEvent(new Event(LOGIN_STREAK_CHANGED_EVENT));
-  }, [user]);
-
-  useEffect(() => {
-    const onLearn = () => {
-      if (!user) return;
-      void loadHomeProfile();
-    };
-    window.addEventListener(LOGIN_STREAK_CHANGED_EVENT, onLearn);
-    return () => window.removeEventListener(LOGIN_STREAK_CHANGED_EVENT, onLearn);
-  }, [user?.uid, loadHomeProfile]);
-
-  /** Overlay when auth streak sync finishes (avoids racing `useIonViewWillEnter`). */
-  useEffect(() => {
-    const onSynced = (ev: Event) => {
-      const d = (ev as CustomEvent<LoginStreakSyncEventDetail>).detail;
-      if (!d?.shouldShowCelebration) return;
-      setLearnStreakCount(d.streakCount);
-      setShowFireOverlay(true);
-    };
-    window.addEventListener(LOGIN_STREAK_SYNCED_EVENT, onSynced as EventListener);
-    return () => window.removeEventListener(LOGIN_STREAK_SYNCED_EVENT, onSynced as EventListener);
-  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -699,17 +560,61 @@ const HomePage: React.FC = () => {
   const circleCircumference = 2 * Math.PI * circleRadius;
   const circleOffset = circleCircumference * (1 - progressPercent / 100);
 
-  const streakWeek = useMemo(
-    () => buildLoginStreakWeekRow(new Set(loginActivityDateKeys)),
-    [loginActivityDateKeys]
+  /** Accent color for the active dialect, reusing the same colors as the dialect carousel. */
+  const activeDialectAccent = useMemo(
+    () => culturalCards.find(c => c.dialectCode === activeLanguageCode)?.tagColor ?? '#0047ab',
+    [activeLanguageCode]
   );
 
-  const streakTitle =
-    learnStreakCount === 1 ? '1 Day Streak!' : `${learnStreakCount} Day Streak!`;
-  const streakSubtitle =
-    learnStreakCount > 0
-      ? "Keep it up! You're logging in every day."
-      : 'Log in daily to start your streak.';
+  const activeDialectMeta = useMemo(
+    () => LANGUAGES.find((l: Language) => l.code === activeLanguageCode),
+    [activeLanguageCode]
+  );
+
+  /** Check whether today's Word of the Day has already been completed for this dialect. */
+  useEffect(() => {
+    if (!user?.uid) {
+      setWodTodayScore(null);
+      setWodStatusLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setWodStatusLoading(true);
+    (async () => {
+      try {
+        const dateKey = phDateKey();
+        const snap = await getDoc(doc(firebaseDb, 'users', user.uid, 'wordOfDayHistory', dateKey));
+        if (cancelled) return;
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data?.dialect === activeLanguageCode && typeof data?.score === 'number') {
+            setWodTodayScore(data.score);
+          } else {
+            setWodTodayScore(null);
+          }
+        } else {
+          setWodTodayScore(null);
+        }
+      } catch (e) {
+        console.warn('Failed to check Word of the Day status:', e);
+        if (!cancelled) setWodTodayScore(null);
+      } finally {
+        if (!cancelled) setWodStatusLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.uid, activeLanguageCode, wodModalOpen]);
+
+  const handleWodComplete = useCallback((completedScore: number) => {
+    setWodTodayScore(completedScore);
+  }, []);
+
+  
+
+  const scrollToCulture = useCallback(() => {
+    const target = document.querySelector('.home-culture');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
 
   const activeDialect = readDialectCodeFromStorage();
   const dialectSections = LEARN_SECTIONS[activeDialect] || LEARN_SECTIONS.filipino;
@@ -752,15 +657,15 @@ const HomePage: React.FC = () => {
           currentLanguageCode={activeLanguageCode}
         />
 
-        {/* Fire lighting overlay — rendered via portal to document.body */}
-        <FireOverlay
-          isOpen={showFireOverlay}
-          streakCount={learnStreakCount}
-          streakWeek={streakWeek}
-          displayName={displayName}
-          onConfirm={handleFireConfirm}
-          onClose={() => setShowFireOverlay(false)}
+        <WordOfDayModal
+          isOpen={wodModalOpen}
+          onClose={() => setWodModalOpen(false)}
+          dialectId={activeLanguageCode}
+          dialectName={activeDialectMeta?.name ?? fluencyLanguageName}
+          accentColor={activeDialectAccent}
+          onComplete={handleWodComplete}
         />
+
 
         <div className="home-page">
           <header className="home-header">
@@ -918,169 +823,87 @@ const HomePage: React.FC = () => {
             </div>
           </section>
 
-          {/* ===== Progress / Mastery Card ===== */}
-          <section className="home-progress">
-            <div className="home-progress__card">
-              <div className="home-progress__content">
-                <div className="home-progress__info">
-                  <h3 className="home-progress__label">Learning Level</h3>
-                  <p className="home-progress__value">
-                    {learningLevel.tier} proficiency sa {fluencyLanguageName}
-                  </p>
-                  <p className="home-progress__change">{learningLevel.weekChangeLabel}</p>
-                  <div className="home-progress__bar-wrap">
-                    <div
-                      className="home-progress__bar"
-                      role="progressbar"
-                      aria-valuenow={progressPercent}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                    >
-                      <div className="home-progress__bar-fill" style={{ width: `${progressPercent}%` }} />
-                    </div>
-                  </div>
-                </div>
-                <div className="home-progress__circle-wrap" aria-label={`${progressPercent}% Proficiency`}>
-                  <svg className="home-progress__circle" viewBox={`0 0 ${circleSize} ${circleSize}`} role="img" aria-hidden="true">
-                    <circle
-                      className="home-progress__circle-bg"
-                      cx={circleSize / 2}
-                      cy={circleSize / 2}
-                      r={circleRadius}
-                      fill="none"
-                      strokeWidth={circleStroke}
-                    />
-                    <circle
-                      className="home-progress__circle-fill"
-                      cx={circleSize / 2}
-                      cy={circleSize / 2}
-                      r={circleRadius}
-                      fill="none"
-                      strokeWidth={circleStroke}
-                      strokeLinecap="round"
-                      strokeDasharray={`${circleCircumference} ${circleCircumference}`}
-                      strokeDashoffset={circleOffset}
-                    />
-                  </svg>
-                  <div className="home-progress__circle-text" aria-hidden="true">
-                    <span className="home-progress__circle-value">{progressPercent}</span>
-                    <span className="home-progress__circle-percent">%</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* ===== Day Streak ===== */}
-          <section className="home-streak">
-
-            {/* Reminder badge — only when today hasn't been lit */}
-            {!todayStreakLit && learnStreakCount > 0 && (
-              <div className="home-streak__reminder" role="alert">
-                <span className="home-streak__reminder-dot" aria-hidden="true" />
-                <span>You haven&apos;t logged today yet — keep your streak alive!</span>
-              </div>
-            )}
-            {!todayStreakLit && learnStreakCount === 0 && (
-              <div className="home-streak__reminder" role="alert">
-                <span className="home-streak__reminder-dot" aria-hidden="true" />
-                <span>Complete a lesson today to start your streak!</span>
-              </div>
-            )}
-
-            <div
-              className={`home-streak__card${!todayStreakLit ? ' home-streak__card--tappable' : ''}`}
-              onClick={() => { if (!todayStreakLit) setShowFireOverlay(true); }}
-              role={!todayStreakLit ? 'button' : undefined}
-              tabIndex={!todayStreakLit ? 0 : undefined}
-              aria-label={!todayStreakLit ? "Tap to light today's streak" : undefined}
-              onKeyDown={e => {
-                if (!todayStreakLit && (e.key === 'Enter' || e.key === ' ')) {
-                  setShowFireOverlay(true);
-                }
-              }}
+          {/* ===== Word of the Day Card ===== */}
+          <section className="home-wod">
+            <button
+              className="home-wod__card"
+              style={{ background: `linear-gradient(135deg, ${activeDialectAccent} 0%, #7c3aed 100%)` }}
+              onClick={() => setWodModalOpen(true)}
             >
-              {/* Hover overlay — fades in on hover */}
-              <div className="home-streak__hover-overlay" aria-hidden="true">
-                <span className="home-streak__hover-icon">🔥</span>
-                <span className="home-streak__hover-text">
-                  {todayStreakLit
-                    ? "You've lit today's streak!"
-                    : "Tap to light today's streak!"}
-                </span>
+              <div className="home-wod__icon-wrap">
+                <IonIcon icon={wodTodayScore !== null ? checkmarkCircle : micOutline} className="home-wod__icon" />
               </div>
-
-              <div className="home-streak__header">
-                <div className="home-streak__icon-wrap" aria-hidden>
-                  <span className="home-streak__icon">🔥</span>
-                </div>
-                <div className="home-streak__info">
-                  <h3 className="home-streak__title">{streakTitle}</h3>
-                  <p className="home-streak__subtitle">{streakSubtitle}</p>
-                </div>
+              <div className="home-wod__info">
+                <h3 className="home-wod__label">Words of the Day</h3>
+                {wodStatusLoading ? (
+                  <p className="home-wod__value">Loading…</p>
+                ) : wodTodayScore !== null ? (
+                  <p className="home-wod__value">Done — {wodTodayScore}% accuracy for today's set</p>
+                ) : (
+                  <p className="home-wod__value">
+                    Practice today's three words in {activeDialectMeta?.name ?? fluencyLanguageName}
+                  </p>
+                )}
               </div>
-              <div className="home-streak__days" aria-label="Weekly streak">
-                {streakWeek.map((d, idx) => (
-                  <div
-                    key={`${d.label}-${idx}`}
-                    className={[
-                      'home-streak__day',
-                      d.state === 'completed' ? 'home-streak__day--completed' : '',
-                      d.state === 'today' ? 'home-streak__day--today' : '',
-                    ].filter(Boolean).join(' ')}
-                  >
-                    <span className="home-streak__day-label">{d.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+              <span className="home-wod__cta">
+                {wodTodayScore !== null ? 'Review' : 'Practice'}
+              </span>
+            </button>
           </section>
 
-          <section className="home-lessons" aria-label="Recent lessons">
-            <h3 className="home-lessons__title">Recent Lessons</h3>
-            <div className="home-lessons__carousel" ref={lessonsCarouselRef}>
-              {recentLessons.map((l, idx) => (
-                <div
-                  key={idx}
-                  className={[
-                    'home-lessons__card',
-                    l.active ? 'home-lessons__card--active' : '',
-                  ].filter(Boolean).join(' ')}
-                >
-                  <div className="home-lessons__card-icon" aria-hidden>{l.icon}</div>
-                  <h4 className="home-lessons__card-title">{l.title}</h4>
-                  <p className="home-lessons__card-desc">{l.desc}</p>
-                  <span className="home-lessons__card-status">{l.status}</span>
-                </div>
-              ))}
-            </div>
-            <div className="home-lessons__dots" aria-hidden>
-              {recentLessons.map((_, idx) => (
-                <span
-                  key={idx}
-                  className={[
-                    'home-lessons__dot',
-                    idx === lessonsCarouselIndex ? 'home-lessons__dot--active' : '',
-                  ].filter(Boolean).join(' ')}
-                />
-              ))}
-            </div>
-          </section>
+
+          
 
           <section className="home-recommendations">
-            <h3 className="home-recommendations__title">SalinTayo Recommends</h3>
+            <div className="home-recommendations__header">
+              <h3 className="home-recommendations__title">SalinTayo Recommends</h3>
+              <p className="home-recommendations__subtitle">Try one quick language boost for today.</p>
+            </div>
             <ul className="home-recommendations__list">
-              <li className="home-recommendations__item">
-                <span className="home-recommendations__icon" aria-hidden>📚</span>
-                Start learning {getPreferredLanguageDisplayName()}
+              <li>
+                <button
+                  type="button"
+                  className="home-recommendations__item"
+                  onClick={() => setWodModalOpen(true)}
+                >
+                  <span className="home-recommendations__icon" aria-hidden>
+                    🔊
+                  </span>
+                  <div className="home-recommendations__content">
+                    <span className="home-recommendations__label">Practice today&apos;s word</span>
+                    <span className="home-recommendations__meta">Open Word of the Day for {activeDialectMeta?.name ?? fluencyLanguageName}</span>
+                  </div>
+                </button>
               </li>
-              <li className="home-recommendations__item">
-                <span className="home-recommendations__icon" aria-hidden>🎤</span>
-                Practice pronunciation with voice recording
+              <li>
+                <button
+                  type="button"
+                  className="home-recommendations__item"
+                  onClick={() => history.push('/chat')}
+                >
+                  <span className="home-recommendations__icon" aria-hidden>
+                    💬
+                  </span>
+                  <div className="home-recommendations__content">
+                    <span className="home-recommendations__label">Try a phrase prompt</span>
+                    <span className="home-recommendations__meta">Open Chat for a quick speaking practice</span>
+                  </div>
+                </button>
               </li>
-              <li className="home-recommendations__item">
-                <span className="home-recommendations__icon" aria-hidden>🧠</span>
-                Take a quiz to test your knowledge
+              <li>
+                <button
+                  type="button"
+                  className="home-recommendations__item"
+                  onClick={scrollToCulture}
+                >
+                  <span className="home-recommendations__icon" aria-hidden>
+                    🌏
+                  </span>
+                  <div className="home-recommendations__content">
+                    <span className="home-recommendations__label">Explore culture today</span>
+                    <span className="home-recommendations__meta">See the active dialect card and learn its story</span>
+                  </div>
+                </button>
               </li>
             </ul>
           </section>
@@ -1090,26 +913,18 @@ const HomePage: React.FC = () => {
 
         <footer className="home-footer">
           <nav className="home-nav" aria-label="Main">
-            <Link to="/learn" className="home-nav__item">
-              <IonIcon icon={bookOutline} className="home-nav__icon" />
-              <span className="home-nav__label">Learn</span>
-            </Link>
-            <Link to="/quiz" className="home-nav__item">
-              <IonIcon icon={documentTextOutline} className="home-nav__icon" />
-              <span className="home-nav__label">Quiz</span>
-            </Link>
-            <Link to="/home" className={`home-nav__item ${isHome ? 'home-nav__item--active' : ''}`}>
+            <IonRouterLink routerLink="/home" routerDirection="root" className={`home-nav__item ${isHome ? 'home-nav__item--active' : ''}`}>
               <IonIcon icon={homeOutline} className="home-nav__icon" />
               <span className="home-nav__label">Home</span>
-            </Link>
-            <Link to="/chat" className="home-nav__item">
+            </IonRouterLink>
+            <IonRouterLink routerLink="/chat" routerDirection="root" className="home-nav__item">
               <IonIcon icon={chatbubbleOutline} className="home-nav__icon" />
               <span className="home-nav__label">Chat</span>
-            </Link>
-            <Link to="/profile" className="home-nav__item">
+            </IonRouterLink>
+            <IonRouterLink routerLink="/profile" routerDirection="root" className="home-nav__item">
               <IonIcon icon={personOutline} className="home-nav__icon" />
               <span className="home-nav__label">Profile</span>
-            </Link>
+            </IonRouterLink>
           </nav>
         </footer>
       </IonContent>

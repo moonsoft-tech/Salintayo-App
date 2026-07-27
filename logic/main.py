@@ -127,6 +127,21 @@ class WhisperTranscribeResponse(BaseModel):
     text: str
 
 
+def _mime_to_suffix(mime_type: str) -> str:
+    mt = (mime_type or "audio/webm").lower().strip()
+    mapping = {
+        "audio/webm": ".webm",
+        "audio/wav": ".wav",
+        "audio/mpeg": ".mp3",
+        "audio/mp3": ".mp3",
+        "audio/mp4": ".mp4",
+        "audio/aac": ".aac",
+        "audio/ogg": ".ogg",
+        "audio/x-m4a": ".m4a",
+    }
+    return mapping.get(mt, ".webm")
+
+
 @lru_cache(maxsize=2)
 def get_whisper_model(model_name: str) -> Any:
     # Lazy import so the service starts even if the model download is slow.
@@ -153,8 +168,8 @@ def logic_transcribe_whisper(
     model = get_whisper_model(model_name)
 
     audio_bytes = base64.b64decode(req.audio_base64)
-    # Whisper/ffmpeg handles different containers; we keep a consistent extension.
-    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+    suffix = _mime_to_suffix(req.mime_type)
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(audio_bytes)
         tmp_path = tmp.name
 

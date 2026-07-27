@@ -189,6 +189,7 @@
   right: 0;
   bottom: calc(var(--chat-footer-height) + 68px + env(safe-area-inset-bottom, 0));
   overflow-y: auto;
+  transition: bottom 0.15s ease-out;
   overflow-x: hidden;
   padding: 196px 20px 20px;
   box-sizing: border-box;
@@ -503,6 +504,17 @@
   box-sizing: border-box;
 }
 
+/* Nav is hidden while the keyboard is open (see .chat-footer--keyboard-open),
+   so the input bar should sit flush with the viewport bottom instead of
+   leaving a gap where the nav used to be. */
+.chat-page--keyboard-open .chat-input-wrap {
+  bottom: 0;
+}
+
+.chat-page--keyboard-open .chat-messages {
+  bottom: 68px;
+}
+
 .chat-input-wrap--with-preview {
   border-top: none;
   box-shadow: none;
@@ -611,6 +623,10 @@
   animation: slideUp 0.2s ease-out;
 }
 
+.chat-page--keyboard-open .chat-inline-preview {
+  bottom: 64px;
+}
+
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -694,14 +710,40 @@
 /* ===== Bottom navigation ===== */
 
 .chat-footer {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100%;
   background: #ffffff;
   border-top: 1px solid rgba(0, 0, 0, 0.07);
   padding-bottom: env(safe-area-inset-bottom, 0);
   z-index: 100;
+}
+
+/*
+ * When the keyboard is open, the webview's viewport has shrunk, so
+ * `bottom: 0 !important` above no longer means "bottom of the screen" —
+ * it means "top of the keyboard". Left alone, the nav would float up and
+ * sit visibly between the input box and the keyboard. Instead we hide it:
+ * the true bottom of the screen is now covered by the keyboard anyway, so
+ * this keeps the nav pinned at the real bottom of the screen (just
+ * obscured), matching how bottom tab bars behave in Messenger/WhatsApp.
+ */
+.chat-footer--keyboard-open {
+  display: none;
+}
+
+.chat-input-wrap,
+.chat-inline-preview {
+  position: fixed !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100%;
+}
+
+.chat-input-wrap {
+  z-index: 105;
 }
 
 .chat-nav {
@@ -835,7 +877,7 @@
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
-  z-index: 90;
+  z-index: 205;
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }
@@ -848,7 +890,7 @@
   width: 78vw;
   max-width: 300px;
   background: #ffffff;
-  z-index: 100;
+  z-index: 210;
   display: flex;
   flex-direction: column;
   transform: translateX(-100%);

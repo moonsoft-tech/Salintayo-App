@@ -40,23 +40,64 @@ function shortenContent(s: string, max = MAX_CONTENT): string {
   return `${s.slice(0, max)}…`;
 }
 
+/**
+ * Firestore's setDoc()/batch.set() reject any field whose value is literally
+ * `undefined` — the key must be omitted entirely (or set to `null`) instead.
+ * Building payload objects with optional keys like `audioUrl: someMaybeUndefinedValue`
+ * still leaves that key present (just holding `undefined`), which is exactly what
+ * Firestore rejects. This strips those keys out right before a write, so it's the
+ * one place that guarantees every payload is safe regardless of which fields the
+ * caller happened to set.
+ */
+function omitUndefinedFields<T extends Record<string, unknown>>(obj: T): Partial<T> {
+  const clean: Partial<T> = {};
+  (Object.keys(obj) as (keyof T)[]).forEach((key) => {
+    if (obj[key] !== undefined) {
+      clean[key] = obj[key];
+    }
+  });
+  return clean;
+}
+
+// Firestore documents are capped at ~1MiB total across all fields. More
+// importantly: truncating a base64 `data:` URI (the previous behavior) does
+// not shrink the image — it corrupts it into a string that no longer parses
+// as a valid data URI at all. Rendering that as `<img src={...}>` is exactly
+// what produced the `net::ERR_INVALID_URL` errors. Truncation must never be
+// applied to base64 image data; the only safe options are "store the whole
+// thing" or "don't store it at all", so oversized inline images are dropped
+// entirely here rather than persisted corrupted. The sender still sees the
+// image in their current session via the in-memory ChatMessage — only the
+// Firestore-persisted copy (for reload / other devices) omits it.
+//
+// TODO(proper fix): upload the image blob to Firebase Storage and persist
+// the resulting https download URL here instead of inline base64. That
+// removes this size ceiling entirely and lets images survive reload.
+const MAX_INLINE_IMAGE_DATA_URL_LENGTH = 700_000;
+
+function sanitizeImageUrlForFirestore(imageUrl: string | undefined): string | undefined {
+  if (!imageUrl) return undefined;
+  // Blob URLs (from URL.createObjectURL) are only valid for the tab/session
+  // that created them — persisting them to Firestore would produce a dead
+  // link on reload or on another device, so treat them the same as "not set".
+  if (imageUrl.startsWith('blob:')) return undefined;
+  if (imageUrl.length > MAX_INLINE_IMAGE_DATA_URL_LENGTH) return undefined;
+  return imageUrl;
+}
+
 function sanitizeForFirestore(msg: PersistableChatMessage): Omit<FirestoreChatMessagePayload, 'createdAt'> {
   let content = msg.content ?? '';
   if (content.startsWith('data:image') || content.length > 50000) {
     content = msg.type === 'image' ? shortenContent(content, 2000) : '[image or large payload omitted for storage]';
   }
-  const audioUrl =
-    msg.audioUrl && !msg.audioUrl.startsWith('blob:') ? msg.audioUrl : undefined;
-  const imageUrl =
-    msg.imageUrl && !msg.imageUrl.startsWith('blob:')
-      ? shortenContent(msg.imageUrl, 2000)
-      : msg.imageUrl?.startsWith('blob:')
-        ? undefined
-        : msg.imageUrl
-          ? shortenContent(msg.imageUrl, 2000)
-          : undefined;
 
-  return {
+  // Blob URLs (from URL.createObjectURL) are only valid for the tab/session
+  // that created them — persisting them to Firestore would produce a dead
+  // link on reload or on another device, so treat them the same as "not set".
+  const audioUrl = msg.audioUrl && !msg.audioUrl.startsWith('blob:') ? msg.audioUrl : undefined;
+  const imageUrl = sanitizeImageUrlForFirestore(msg.imageUrl);
+
+  const payload: Omit<FirestoreChatMessagePayload, 'createdAt'> = {
     chatId: '',
     senderId: msg.role === 'user' ? '' : 'ai',
     role: msg.role,
@@ -68,6 +109,10 @@ function sanitizeForFirestore(msg: PersistableChatMessage): Omit<FirestoreChatMe
     imageUrl,
     translationMode: msg.translationMode,
   };
+
+  // Guarantee the returned object never carries an explicit `undefined` value,
+  // regardless of which optional fields were absent on `msg`.
+  return omitUndefinedFields(payload) as Omit<FirestoreChatMessagePayload, 'createdAt'>;
 }
 
 type FirestoreChatMessagePayload = {

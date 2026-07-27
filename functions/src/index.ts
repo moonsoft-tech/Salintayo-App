@@ -546,7 +546,7 @@ export const transcribeWhisper = functions.https.onRequest((req, res) => {
 
     try {
       const openaiKey = getOpenAIApiKey();
-      const mimeType = (body.mime_type || 'audio/webm').toLowerCase();
+      const mimeType = (body.mime_type || 'audio/webm').toLowerCase().split(';')[0].trim();
       const allowed = new Set([
         'audio/webm',
         'audio/wav',
