@@ -571,7 +571,7 @@ function hasReadableOcrText(text: string): boolean {
  * ad hoc at each message-construction call site — means new optional fields
  * added later can't reintroduce the same failure.
  */
-function stripUndefinedFields<T extends Record<string, unknown>>(obj: T): Partial<T> {
+function stripUndefinedFields<T extends object>(obj: T): Partial<T> {
   const clean: Partial<T> = {};
   (Object.keys(obj) as (keyof T)[]).forEach((key) => {
     if (obj[key] !== undefined) {
