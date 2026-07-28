@@ -32,6 +32,26 @@ workflows:
             npx cap add ios --packagemanager SPM
           fi
           npx cap sync ios
+      - name: Add Firebase GoogleService-Info.plist
+        script: |
+          echo "$GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 --decode > "$CM_BUILD_DIR/ios/App/App/GoogleService-Info.plist"
+          gem install xcodeproj --no-document
+          ruby -e '
+            require "xcodeproj"
+            project_path = "ios/App/App.xcodeproj"
+            project = Xcodeproj::Project.open(project_path)
+            target = project.targets.first
+            group = project.main_group.find_subpath("App", true)
+            file_ref = group.files.find { |f| f.path == "GoogleService-Info.plist" }
+            unless file_ref
+              file_ref = group.new_reference("GoogleService-Info.plist")
+              target.resources_build_phase.add_file_reference(file_ref)
+              project.save
+              puts "GoogleService-Info.plist added to Xcode project and Copy Bundle Resources."
+            else
+              puts "GoogleService-Info.plist already referenced in Xcode project."
+            end
+          '
       - name: Build unsigned iOS simulator app
         script: |
           cd $CM_BUILD_DIR/ios/App
@@ -86,6 +106,26 @@ workflows:
             npx cap add ios --packagemanager SPM
           fi
           npx cap sync ios
+      - name: Add Firebase GoogleService-Info.plist
+        script: |
+          echo "$GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 --decode > "$CM_BUILD_DIR/ios/App/App/GoogleService-Info.plist"
+          gem install xcodeproj --no-document
+          ruby -e '
+            require "xcodeproj"
+            project_path = "ios/App/App.xcodeproj"
+            project = Xcodeproj::Project.open(project_path)
+            target = project.targets.first
+            group = project.main_group.find_subpath("App", true)
+            file_ref = group.files.find { |f| f.path == "GoogleService-Info.plist" }
+            unless file_ref
+              file_ref = group.new_reference("GoogleService-Info.plist")
+              target.resources_build_phase.add_file_reference(file_ref)
+              project.save
+              puts "GoogleService-Info.plist added to Xcode project and Copy Bundle Resources."
+            else
+              puts "GoogleService-Info.plist already referenced in Xcode project."
+            end
+          '
       - name: Build unsigned iOS device app
         script: |
           cd $CM_BUILD_DIR/ios/App
