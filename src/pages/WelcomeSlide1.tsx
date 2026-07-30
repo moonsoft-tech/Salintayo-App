@@ -3,7 +3,7 @@ import { Link, useHistory } from 'react-router-dom';
 import { IonContent, IonPage } from '@ionic/react';
 import { useIonContentScrollTopOnEnter } from '../utils/useIonContentScrollTopOnEnter';
 import { useAuth } from '../contexts/AuthContext';
-import { hasSeenWelcome } from '../utils/welcomeStorage';
+import { hasSeenWelcome, markOnboardingStepComplete } from '../utils/welcomeStorage';
 import './WelcomeSlide1.css';
 
 const imgLogo = '/logo.png';
@@ -61,7 +61,11 @@ export default function WelcomeSlide1() {
               and connect more deeply with Filipino culture.
             </p>
 
-            <Link to="/welcome-2" className="welcome-slide1__cta">
+            <Link
+              to="/welcome-2"
+              className="welcome-slide1__cta"
+              onClick={() => markOnboardingStepComplete(user?.uid, 'welcome')}
+            >
               Let&apos;s Get Started
             </Link>
           </div>

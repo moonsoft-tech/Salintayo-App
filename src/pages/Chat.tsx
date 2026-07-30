@@ -2066,145 +2066,6 @@ Rules:
             )}
           </header>
 
-          {isHistoryOpen && (
-            <div
-              className="chat-history-overlay"
-              onClick={() => {
-                setIsHistoryOpen(false);
-                setShowClearConfirm(false);
-              }}
-              aria-hidden="true"
-            />
-          )}
-          <aside
-            className={`chat-history-drawer ${isHistoryOpen ? 'chat-history-drawer--open' : ''}`}
-            aria-label="Chat history"
-            aria-hidden={!isHistoryOpen}
-          >
-            <div className="chat-history-drawer__header">
-              <div className="chat-history-drawer__brand">
-                <IonIcon icon={chatbubbleEllipsesOutline} className="chat-history-drawer__logo" aria-hidden />
-                <span className="chat-history-drawer__brand-name">SalinTayo</span>
-              </div>
-              <button
-                type="button"
-                className="chat-history-drawer__collapse"
-                onClick={() => {
-                  setIsHistoryOpen(false);
-                  setShowClearConfirm(false);
-                }}
-                aria-label="Close history"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <line x1="9" y1="3" x2="9" y2="21" />
-                </svg>
-              </button>
-            </div>
-
-            <button type="button" className="chat-history-drawer__new-btn" onClick={startNewChat}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="16" />
-                <line x1="8" y1="12" x2="16" y2="12" />
-              </svg>
-              New chat
-            </button>
-
-            <div className="chat-history-drawer__scroll">
-              {chatHistory.length === 0 ? (
-                <p className="chat-history-drawer__empty">
-                  No previous chats yet.
-                  <br />
-                  Start a conversation and it will appear here.
-                </p>
-              ) : (
-                <>
-                  {chatHistory.map((group) => (
-                    <div key={group.group} className="chat-history-drawer__group">
-                      <p className="chat-history-drawer__group-label">{group.group}</p>
-                      <ul className="chat-history-drawer__list">
-                        {group.sessions.map((session) => (
-                          <li key={session.id} className="chat-history-drawer__list-item">
-                            <button
-                              type="button"
-                              className="chat-history-drawer__item"
-                              onClick={() => handleSelectSession(session)}
-                            >
-                              {session.title}
-                            </button>
-                            <button
-                              type="button"
-                              className="chat-history-drawer__delete-btn"
-                              aria-label="Delete chat"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteSession(session.id);
-                              }}
-                            >
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                <polyline points="3 6 5 6 21 6" />
-                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                                <path d="M10 11v6M14 11v6" />
-                                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                              </svg>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
-
-            {savedSessions.length > 0 && (
-              <div className="chat-history-drawer__footer-actions">
-                {showClearConfirm ? (
-                  <div className="chat-history-drawer__confirm">
-                    <p className="chat-history-drawer__confirm-text">Delete all chat history?</p>
-                    <div className="chat-history-drawer__confirm-btns">
-                      <button
-                        type="button"
-                        className="chat-history-drawer__confirm-cancel"
-                        onClick={() => setShowClearConfirm(false)}
-                      >
-                        Cancel
-                      </button>
-                      <button type="button" className="chat-history-drawer__confirm-delete" onClick={deleteAllSessions}>
-                        Delete all
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button type="button" className="chat-history-drawer__clear-all" onClick={() => setShowClearConfirm(true)}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                      <path d="M10 11v6M14 11v6" />
-                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                    </svg>
-                    Clear all history
-                  </button>
-                )}
-              </div>
-            )}
-
-            <div className="chat-history-drawer__profile">
-              <div className="chat-history-drawer__profile-avatar">
-                {user?.photoURL ? (
-                  <img src={user.photoURL} alt="" className="chat-history-drawer__profile-img" />
-                ) : (
-                  <IonIcon icon={personCircleOutline} aria-hidden />
-                )}
-              </div>
-              <span className="chat-history-drawer__profile-name">{user?.displayName?.trim() || 'My Account'}</span>
-              <button type="button" className="chat-history-drawer__profile-more" aria-label="More options">
-                ···
-              </button>
-            </div>
-          </aside>
-
           <section className="chat-messages" aria-label="Chat conversation">
             {messages.length === 0 && !isEmergencyMode && (
               <div className="chat-empty-state">
@@ -2428,6 +2289,148 @@ Rules:
         onCapture={handleCameraCapture}
         onOpenGallery={openGalleryPicker}
       />
+
+
+          {isHistoryOpen && (
+            <div
+              className="chat-history-overlay"
+              onClick={() => {
+                setIsHistoryOpen(false);
+                setShowClearConfirm(false);
+              }}
+              aria-hidden="true"
+            />
+          )}
+          <aside
+            className={`chat-history-drawer ${isHistoryOpen ? 'chat-history-drawer--open' : ''}`}
+            aria-label="Chat history"
+            aria-hidden={!isHistoryOpen}
+          >
+            <div className="chat-history-drawer__header">
+              <div className="chat-history-drawer__brand">
+                <IonIcon icon={chatbubbleEllipsesOutline} className="chat-history-drawer__logo" aria-hidden />
+                <span className="chat-history-drawer__brand-name">SalinTayo</span>
+              </div>
+              <button
+                type="button"
+                className="chat-history-drawer__collapse"
+                onClick={() => {
+                  setIsHistoryOpen(false);
+                  setShowClearConfirm(false);
+                }}
+                aria-label="Close history"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                </svg>
+              </button>
+            </div>
+
+            <button type="button" className="chat-history-drawer__new-btn" onClick={startNewChat}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="16" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+              New chat
+            </button>
+
+            <div className="chat-history-drawer__scroll">
+              {chatHistory.length === 0 ? (
+                <p className="chat-history-drawer__empty">
+                  No previous chats yet.
+                  <br />
+                  Start a conversation and it will appear here.
+                </p>
+              ) : (
+                <>
+                  {chatHistory.map((group) => (
+                    <div key={group.group} className="chat-history-drawer__group">
+                      <p className="chat-history-drawer__group-label">{group.group}</p>
+                      <ul className="chat-history-drawer__list">
+                        {group.sessions.map((session) => (
+                          <li key={session.id} className="chat-history-drawer__list-item">
+                            <button
+                              type="button"
+                              className="chat-history-drawer__item"
+                              onClick={() => handleSelectSession(session)}
+                            >
+                              {session.title}
+                            </button>
+                            <button
+                              type="button"
+                              className="chat-history-drawer__delete-btn"
+                              aria-label="Delete chat"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteSession(session.id);
+                              }}
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                <polyline points="3 6 5 6 21 6" />
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                                <path d="M10 11v6M14 11v6" />
+                                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                              </svg>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+
+            {savedSessions.length > 0 && (
+              <div className="chat-history-drawer__footer-actions">
+                {showClearConfirm ? (
+                  <div className="chat-history-drawer__confirm">
+                    <p className="chat-history-drawer__confirm-text">Delete all chat history?</p>
+                    <div className="chat-history-drawer__confirm-btns">
+                      <button
+                        type="button"
+                        className="chat-history-drawer__confirm-cancel"
+                        onClick={() => setShowClearConfirm(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button type="button" className="chat-history-drawer__confirm-delete" onClick={deleteAllSessions}>
+                        Delete all
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" className="chat-history-drawer__clear-all" onClick={() => setShowClearConfirm(true)}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6M14 11v6" />
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                    Clear all history
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="chat-history-drawer__profile">
+              <div className="chat-history-drawer__profile-avatar">
+                {user?.photoURL ? (
+                  <img src={user.photoURL} alt="" className="chat-history-drawer__profile-img" />
+                ) : (
+                  <IonIcon icon={personCircleOutline} aria-hidden />
+                )}
+              </div>
+              <span className="chat-history-drawer__profile-name">{user?.displayName?.trim() || 'My Account'}</span>
+              <button type="button" className="chat-history-drawer__profile-more" aria-label="More options">
+                ···
+              </button>
+            </div>
+          </aside>
+
+
     </IonPage>
   );
 };

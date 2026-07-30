@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Redirect, Route, useLocation } from 'react-router-dom';
 import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import ProtectedRoute from './components/ProtectedRoute';
+import WelcomeRoute from './components/WelcomeRoute';
 import RootRedirect from './components/RootRedirect';
 import Home from './pages/Home';
 import LoginPage from './pages/Login';
@@ -48,97 +49,52 @@ import './theme/variables.css';
 
 setupIonicReact();
 
-/**
- * Routes where the bubble stays hidden until the learner navigates to at least
- * one other screen in this session (so the first Home / welcome landing is not covered).
- */
-const QCB_SUPPRESS_UNTIL_NAV_AWAY = ['/home', '/welcome', '/welcome-2', '/cultural-intro'] as const;
-const QCB_SUPPRESS_LANDING_SET = new Set<string>(QCB_SUPPRESS_UNTIL_NAV_AWAY);
+/** Paths where the bubble should never show — onboarding screens plus root/login. */
+const QCB_HIDDEN_PATHS = new Set<string>(['/', '/login', '/welcome', '/welcome-2', '/cultural-intro']);
 
-const QCB_PATHS_THAT_DONT_COUNT_AS_LEFT_LANDING = new Set<string>([
-  '/',
-  '/login',
-  ...QCB_SUPPRESS_UNTIL_NAV_AWAY,
-]);
-
-const QCB_LEFT_LANDING_SESSION_KEY = 'salintayo_qcb_left_landing';
-
-/** Quick Chat only for signed-in users; not on login/root; one instance app-wide. */
+/** Quick Chat only for signed-in users who've finished onboarding; not on login/root/welcome. */
 const QuickChatBubbleGate: React.FC = () => {
   const { user, loading } = useAuth();
   const { pathname } = useLocation();
-  const [leftFirstLanding, setLeftFirstLanding] = useState(() => {
-    try {
-      return sessionStorage.getItem(QCB_LEFT_LANDING_SESSION_KEY) === '1';
-    } catch {
-      return false;
-    }
-  });
 
-  useEffect(() => {
-    if (!QCB_PATHS_THAT_DONT_COUNT_AS_LEFT_LANDING.has(pathname)) {
-      try {
-        sessionStorage.setItem(QCB_LEFT_LANDING_SESSION_KEY, '1');
-      } catch {
-        /* ignore */
-      }
-      setLeftFirstLanding(true);
-    }
-  }, [pathname]);
-
-  if (pathname === '/' || pathname === '/login') return null;
   if (loading || !user) return null;
-  if (QCB_SUPPRESS_LANDING_SET.has(pathname) && !leftFirstLanding) {
-    return null;
-  }
+  if (QCB_HIDDEN_PATHS.has(pathname)) return null;
   return <QuickChatBubble />;
 };
 
-const App: React.FC = () => {
-  try {
-    useEffect(() => {
-      logBootStep('[BOOT 04] App mounted');
-      logBootStep('[BOOT 08] Router initialized');
-      logBootStep('[BOOT 10] First page rendered');
-    }, []);
+const App: React.FC = () => (
+  <IonApp>
+    <IonReactRouter>
+      <IonRouterOutlet>
+        <ProtectedRoute exact path="/home">
+          <Home />
+        </ProtectedRoute>
 
-    return (
-      <IonApp>
-        <IonReactRouter>
-          <IonRouterOutlet>
-            <ProtectedRoute exact path="/home">
-              <Home />
-            </ProtectedRoute>
-
-            <ProtectedRoute exact path="/chat">
-              <Chat />
-            </ProtectedRoute>
-            <ProtectedRoute exact path="/profile">
-              <Profile />
-            </ProtectedRoute>
-            <ProtectedRoute exact path="/cultural-intro">
-              <CulturalIntroSlide />
-            </ProtectedRoute>
-            <Route exact path="/">
-              <RootRedirect />
-            </Route>
-            <ProtectedRoute exact path="/welcome">
-              <WelcomeSlide1 />
-            </ProtectedRoute>
-            <ProtectedRoute exact path="/welcome-2">
-              <WelcomeSlide2 />
-            </ProtectedRoute>
-            <Route exact path="/login">
-              <LoginPage />
-            </Route>
-          </IonRouterOutlet>
-          <QuickChatBubbleGate />
-        </IonReactRouter>
-      </IonApp>
-    );
-  } catch (error) {
-    return <StartupDebug error={error as Error} component="App" />;
-  }
-};
+        <ProtectedRoute exact path="/chat">
+          <Chat />
+        </ProtectedRoute>
+        <ProtectedRoute exact path="/profile">
+          <Profile />
+        </ProtectedRoute>
+        <WelcomeRoute exact path="/cultural-intro" step="cultural-intro">
+          <CulturalIntroSlide />
+        </WelcomeRoute>
+        <Route exact path="/">
+          <RootRedirect />
+        </Route>
+        <WelcomeRoute exact path="/welcome" step="welcome">
+          <WelcomeSlide1 />
+        </WelcomeRoute>
+        <WelcomeRoute exact path="/welcome-2" step="welcome2">
+          <WelcomeSlide2 />
+        </WelcomeRoute>
+        <Route exact path="/login">
+          <LoginPage />
+        </Route>
+      </IonRouterOutlet>
+      <QuickChatBubbleGate />
+    </IonReactRouter>
+  </IonApp>
+);
 
 export default App;

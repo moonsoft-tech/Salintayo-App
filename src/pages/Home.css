@@ -200,12 +200,12 @@
 
 /* Header greeting subtitle should be readable on the blue banner */
 .home-header__greeting .home-greeting__subtitle {
-  color: #facc15;
+  color: #ffffff;
 }
 
 /* Header greeting title should match subtitle accent */
 .home-header__greeting .home-greeting__title {
-  color: #facc15;
+  color: #ffffff;
 }
 
 /* ===== Cultural Context Card Strip ===== */

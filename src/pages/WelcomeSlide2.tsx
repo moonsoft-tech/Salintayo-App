@@ -3,7 +3,7 @@ import { useHistory } from 'react-router-dom';
 import { IonContent, IonPage } from '@ionic/react';
 import { useIonContentScrollTopOnEnter } from '../utils/useIonContentScrollTopOnEnter';
 import { useAuth } from '../contexts/AuthContext';
-import { hasSeenWelcome } from '../utils/welcomeStorage';
+import { hasSeenWelcome, markOnboardingStepComplete } from '../utils/welcomeStorage';
 import {
   DIALECT_LANG_STORAGE_KEY,
   QCB_DIALECT_LANG_STORAGE_KEY,
@@ -41,6 +41,7 @@ export default function WelcomeSlide2() {
       window.dispatchEvent(new Event('salintayo_lang_changed'));
       window.dispatchEvent(new Event('salintayo_qcb_lang_changed'));
     } catch {}
+    markOnboardingStepComplete(user?.uid, 'welcome2');
     history.push('/cultural-intro');
   };
 

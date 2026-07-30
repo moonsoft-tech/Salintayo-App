@@ -32,3 +32,54 @@ export function clearLegacyWelcomeGlobalKey(): void {
     /* ignore */
   }
 }
+
+/* ─── Onboarding step order enforcement ─────────────────────────── */
+
+const STEP_KEY_PREFIX = 'salintayo_welcome_step_';
+
+export type OnboardingStep = 'welcome' | 'welcome2' | 'cultural-intro';
+
+/** Order matters: index = position in the required flow. */
+const STEP_ORDER: OnboardingStep[] = ['welcome', 'welcome2', 'cultural-intro'];
+
+export const STEP_PATH: Record<OnboardingStep, string> = {
+  welcome: '/welcome',
+  welcome2: '/welcome-2',
+  'cultural-intro': '/cultural-intro',
+};
+
+function getFurthestCompletedIdx(userId: string | undefined): number {
+  try {
+    if (!userId) return -1;
+    const stored = localStorage.getItem(`${STEP_KEY_PREFIX}${userId}`) as OnboardingStep | null;
+    return stored ? STEP_ORDER.indexOf(stored) : -1;
+  } catch {
+    return -1;
+  }
+}
+
+/** Call when a user finishes a step (e.g. taps "Continue") — advances the marker if this step is further than before. */
+export function markOnboardingStepComplete(userId: string | undefined, step: OnboardingStep): void {
+  try {
+    if (!userId) return;
+    const currentIdx = getFurthestCompletedIdx(userId);
+    const newIdx = STEP_ORDER.indexOf(step);
+    if (newIdx > currentIdx) {
+      localStorage.setItem(`${STEP_KEY_PREFIX}${userId}`, step);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/** True if the user is allowed to view this step right now (current step, or one step ahead of what they've completed). */
+export function canAccessStep(userId: string | undefined, step: OnboardingStep): boolean {
+  const targetIdx = STEP_ORDER.indexOf(step);
+  return targetIdx <= getFurthestCompletedIdx(userId) + 1;
+}
+
+/** Where to send a user who tries to jump ahead — the correct next step for them right now. */
+export function getCurrentAllowedStepPath(userId: string | undefined): string {
+  const nextIdx = Math.min(getFurthestCompletedIdx(userId) + 1, STEP_ORDER.length - 1);
+  return STEP_PATH[STEP_ORDER[nextIdx]];
+}
