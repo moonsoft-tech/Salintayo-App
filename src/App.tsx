@@ -13,6 +13,8 @@ import Profile from './pages/Profile';
 import CulturalIntroSlide from './pages/CulturalIntroSlide';
 import QuickChatBubble from './pages/QuickChatBubble';
 import { useAuth } from './contexts/AuthContext';
+import { logBootStep } from './bootLogger';
+import { StartupDebug } from './StartupDebug';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -92,39 +94,51 @@ const QuickChatBubbleGate: React.FC = () => {
   return <QuickChatBubble />;
 };
 
-const App: React.FC = () => (
-  <IonApp>
-    <IonReactRouter>
-      <IonRouterOutlet>
-        <ProtectedRoute exact path="/home">
-          <Home />
-        </ProtectedRoute>
+const App: React.FC = () => {
+  try {
+    useEffect(() => {
+      logBootStep('[BOOT 04] App mounted');
+      logBootStep('[BOOT 08] Router initialized');
+      logBootStep('[BOOT 10] First page rendered');
+    }, []);
 
-        <ProtectedRoute exact path="/chat">
-          <Chat />
-        </ProtectedRoute>
-        <ProtectedRoute exact path="/profile">
-          <Profile />
-        </ProtectedRoute>
-        <ProtectedRoute exact path="/cultural-intro">
-          <CulturalIntroSlide />
-        </ProtectedRoute>
-        <Route exact path="/">
-          <RootRedirect />
-        </Route>
-        <ProtectedRoute exact path="/welcome">
-          <WelcomeSlide1 />
-        </ProtectedRoute>
-        <ProtectedRoute exact path="/welcome-2">
-          <WelcomeSlide2 />
-        </ProtectedRoute>
-        <Route exact path="/login">
-          <LoginPage />
-        </Route>
-      </IonRouterOutlet>
-      <QuickChatBubbleGate />
-    </IonReactRouter>
-  </IonApp>
-);
+    return (
+      <IonApp>
+        <IonReactRouter>
+          <IonRouterOutlet>
+            <ProtectedRoute exact path="/home">
+              <Home />
+            </ProtectedRoute>
+
+            <ProtectedRoute exact path="/chat">
+              <Chat />
+            </ProtectedRoute>
+            <ProtectedRoute exact path="/profile">
+              <Profile />
+            </ProtectedRoute>
+            <ProtectedRoute exact path="/cultural-intro">
+              <CulturalIntroSlide />
+            </ProtectedRoute>
+            <Route exact path="/">
+              <RootRedirect />
+            </Route>
+            <ProtectedRoute exact path="/welcome">
+              <WelcomeSlide1 />
+            </ProtectedRoute>
+            <ProtectedRoute exact path="/welcome-2">
+              <WelcomeSlide2 />
+            </ProtectedRoute>
+            <Route exact path="/login">
+              <LoginPage />
+            </Route>
+          </IonRouterOutlet>
+          <QuickChatBubbleGate />
+        </IonReactRouter>
+      </IonApp>
+    );
+  } catch (error) {
+    return <StartupDebug error={error as Error} component="App" />;
+  }
+};
 
 export default App;

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
+import { logBootStep } from '../bootLogger';
+import { StartupDebug } from '../StartupDebug';
 import {
   onAuthStateChanged,
   getRedirectResult,
@@ -8,7 +10,7 @@ import {
   indexedDBLocalPersistence,
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
-import { firebaseAuth } from '../firebase';
+import { getFirebase } from '../firebase';
 import { LOGIN_ACTIVITY_DATES_KEY, LOGIN_STREAK_CHANGED_EVENT } from '../utils/learnStreak';
 import { dispatchLoginStreakSynced, syncLoginStreakOnAuth } from '../utils/loginStreakFirestore';
 
@@ -20,10 +22,13 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue>({ user: null, loading: true });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [startupError, setStartupError] = useState<Error | null>(null);
+  const { auth: firebaseAuth } = getFirebase();
   const [user, setUser] = useState<User | null>(() => firebaseAuth.currentUser);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    logBootStep('[BOOT 05] AuthProvider mounted');
     let isMounted = true;
     const configurePersistence = async () => {
       if (Capacitor.isNativePlatform()) {
@@ -41,17 +46,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Web only: consume redirect result when popup was blocked (native uses plugin + credential)
-    if (!Capacitor.isNativePlatform()) {
-      getRedirectResult(firebaseAuth).catch(() => {
-        // Ignore: user may have landed here without a redirect
-      });
+    try {
+      if (!Capacitor.isNativePlatform()) {
+        getRedirectResult(firebaseAuth).catch(() => {
+          // Ignore: user may have landed here without a redirect
+        });
+      }
+      void configurePersistence();
+    } catch (error) {
+      setStartupError(error as Error);
     }
-    void configurePersistence();
 
     const unsubscribe = onAuthStateChanged(firebaseAuth, (u) => {
       if (!isMounted) return;
-      // Defer state update to next tick so Redirect runs without causing "Maximum update depth" with IonReactRouter
       queueMicrotask(() => {
         if (!isMounted) return;
         setUser(u);
@@ -85,6 +92,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo(() => ({ user, loading }), [user, loading]);
+
+  if (startupError) {
+    return <StartupDebug error={startupError} component="AuthContext.tsx" />;
+  }
 
   return (
     <AuthContext.Provider value={value}>

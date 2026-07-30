@@ -3,26 +3,33 @@ import { Redirect } from 'react-router-dom';
 import { IonPage, IonSpinner } from '@ionic/react';
 import { useAuth } from '../contexts/AuthContext';
 import { hasSeenWelcome } from '../utils/welcomeStorage';
+import { logBootStep } from '../bootLogger';
+import { StartupDebug } from '../StartupDebug';
 
 /**
  * Handles root "/" route: sends logged-in users to home/welcome, others to login.
  */
 export default function RootRedirect() {
-  const { user, loading } = useAuth();
+  try {
+    logBootStep('[BOOT 09] RootRedirect entered');
+    const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <IonPage>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-          <IonSpinner />
-        </div>
-      </IonPage>
-    );
+    if (loading) {
+      return (
+        <IonPage>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+            <IonSpinner />
+          </div>
+        </IonPage>
+      );
+    }
+
+    if (user) {
+      return <Redirect to={hasSeenWelcome(user.uid) ? '/home' : '/welcome'} />;
+    }
+
+    return <Redirect to="/login" />;
+  } catch (error) {
+    return <StartupDebug error={error as Error} component="RootRedirect" />;
   }
-
-  if (user) {
-    return <Redirect to={hasSeenWelcome(user.uid) ? '/home' : '/welcome'} />;
-  }
-
-  return <Redirect to="/login" />;
 }
