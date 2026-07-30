@@ -26,6 +26,17 @@ workflows:
       - name: Build web bundle
         script: |
           npm run build
+      - name: Strip crossorigin attribute from built HTML
+        script: |
+          # Vite adds crossorigin to <script>/<link> tags by default. In a
+          # Capacitor iOS WKWebView (capacitor://localhost), this can cause
+          # any runtime JS error to be reported as a generic, useless
+          # "Script error." with no stack trace, because the browser hides
+          # error details for scripts it thinks are cross-origin unless the
+          # response includes matching CORS headers - which Capacitor's
+          # local scheme does not reliably provide. Stripping it here
+          # restores real error messages/stack traces on iOS.
+          sed -i '' 's/ crossorigin//g' dist/index.html
       - name: Add and sync Capacitor iOS project
         script: |
           if [ ! -d ios ]; then
@@ -130,6 +141,17 @@ workflows:
       - name: Build web bundle
         script: |
           npm run build
+      - name: Strip crossorigin attribute from built HTML
+        script: |
+          # Vite adds crossorigin to <script>/<link> tags by default. In a
+          # Capacitor iOS WKWebView (capacitor://localhost), this can cause
+          # any runtime JS error to be reported as a generic, useless
+          # "Script error." with no stack trace, because the browser hides
+          # error details for scripts it thinks are cross-origin unless the
+          # response includes matching CORS headers - which Capacitor's
+          # local scheme does not reliably provide. Stripping it here
+          # restores real error messages/stack traces on iOS.
+          sed -i '' 's/ crossorigin//g' dist/index.html
       - name: Add and sync Capacitor iOS project
         script: |
           if [ ! -d ios ]; then
