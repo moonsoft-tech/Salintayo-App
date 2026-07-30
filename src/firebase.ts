@@ -1,7 +1,7 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, initializeFirestore, persistentLocalCache, type Firestore } from 'firebase/firestore';
-import { logBootStep, auditEnvironmentVariables, logStartupError } from './bootLogger';
+import { logBootStep, auditEnvironmentVariables, logStartupError, renderDebugPage } from './bootLogger';
 
 logBootStep('[BOOT 06] Firebase init started');
 auditEnvironmentVariables([
@@ -38,6 +38,7 @@ export function getFirebase() {
       }
     } catch (error) {
       logStartupError(error, 'firebase.ts');
+      renderDebugPage(error, 'firebase.ts');
       throw error;
     } finally {
       logBootStep('[BOOT 07] Firebase init finished');
@@ -46,4 +47,6 @@ export function getFirebase() {
   return { app, auth, db };
 }
 
+const { app: firebaseApp, auth: firebaseAuth, db: firebaseDb } = getFirebase();
+export { firebaseApp, firebaseAuth, firebaseDb };
 export default getFirebase;
