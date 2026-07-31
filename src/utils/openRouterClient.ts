@@ -19,7 +19,6 @@ export function getOpenRouterHttpReferer(): string {
 
   return publicAppUrl.replace(/\/+$/, '') || 'https://localhost';
 }
-
 export function getOpenRouterFetchHeaders(apiKey: string): Record<string, string> {
   return {
     Authorization: `Bearer ${apiKey}`,
@@ -27,3 +26,4 @@ export function getOpenRouterFetchHeaders(apiKey: string): Record<string, string
     'HTTP-Referer': getOpenRouterHttpReferer(),
   };
 }
+

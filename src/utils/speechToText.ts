@@ -104,6 +104,8 @@ export async function startSpeechToText(params: {
   onError?: (message: string) => void;
   /** If true, web recognition re-starts automatically while still recording. */
   restartOnEnd?: boolean;
+  /** Called when the browser speech recognition session ends. */
+  onEnd?: () => void;
 }): Promise<SpeechToTextSession> {
   const primaryLanguage = params.language ?? 'en-US';
 
@@ -319,6 +321,7 @@ export async function startSpeechToText(params: {
   };
 
   recognition.onend = () => {
+    params.onEnd?.();
     if (!stopping && params.restartOnEnd) {
       try {
         recognition.start();

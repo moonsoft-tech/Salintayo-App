@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { IonIcon } from '@ionic/react';
-import { flashOutline } from 'ionicons/icons';
+import { flashOutline, micOutline, stopOutline, volumeHighOutline } from 'ionicons/icons';
 import { cancelSpeech, speakText } from '../utils/tts';
+import { startSpeechToText, type SpeechToTextSession } from '../utils/speechToText';
+import { chatWithDeepSeek as askOpenRouter } from '../utils/api';
 import { getResolvedDialectLangCode } from '../utils/dialectPreference';
 import './QuickChatBubble.css';
 
@@ -627,30 +629,57 @@ const EmergencyPhrasesModal: React.FC<EmergencyPhrasesModalProps> = ({ isOpen, o
   const [selectedCat, setSelectedCat] = useState<EpCategory | null>(null);
   const [speakingIdx, setSpeakingIdx] = useState<string | null>(null);
 
+  // --- Interpreter Mode States ---
+  const [interpreterMode, setInterpreterMode] = useState(false);
+  const [listeningForReply, setListeningForReply] = useState<string | null>(null);
+  const [replyTranslations, setReplyTranslations] = useState<Record<string, string>>({});
+  const [liveReplyTranscript, setLiveReplyTranscript] = useState('');
+  const speechSessionRef = useRef<SpeechToTextSession | null>(null);
+  const listeningForReplyRef = useRef<string | null>(null);
+  const isProcessingRef = useRef(false);
+
   const [langCode, setLangCode] = useState<string>(getLangCode);
   useEffect(() => {
     const onLangChanged = () => setLangCode(getLangCode());
+    const onStorageChanged = (e: StorageEvent) => {
+      if (e.key === QCB_LANG_KEY || e.key === LANG_KEY) setLangCode(getLangCode());
+    };
     window.addEventListener('salintayo_lang_changed', onLangChanged);
     window.addEventListener('salintayo_qcb_lang_changed', onLangChanged);
-    window.addEventListener('storage', (e: StorageEvent) => {
-      if (e.key === QCB_LANG_KEY || e.key === LANG_KEY) setLangCode(getLangCode());
-    });
+    window.addEventListener('storage', onStorageChanged);
     return () => {
       window.removeEventListener('salintayo_lang_changed', onLangChanged);
       window.removeEventListener('salintayo_qcb_lang_changed', onLangChanged);
+      window.removeEventListener('storage', onStorageChanged);
     };
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      setSelectedCat(null);
-    } else {
+    if (!isOpen) {
       cancelSpeech();
       setSpeakingIdx(null);
+      // Stop any active STT session
+      if (speechSessionRef.current) {
+        speechSessionRef.current.stop().catch(() => {});
+        speechSessionRef.current = null;
+      }
+      setListeningForReply(null);
+      setLiveReplyTranscript('');
+      isProcessingRef.current = false;
     }
   }, [isOpen]);
 
-  const handleBack = () => setSelectedCat(null);
+  useEffect(() => {
+    listeningForReplyRef.current = listeningForReply;
+  }, [listeningForReply]);
+
+  const handleBack = () => {
+    cancelSpeech();
+    setSpeakingIdx(null);
+    setSelectedCat(null);
+    setReplyTranslations({});
+    setListeningForReply(null);
+  };
 
   /** Spoken text uses translation when available so TTS matches the user’s preferred language; UI still shows English first. */
   const handleSpeak = useCallback(
@@ -671,6 +700,122 @@ const EmergencyPhrasesModal: React.FC<EmergencyPhrasesModalProps> = ({ isOpen, o
     },
     [speakingIdx],
   );
+
+  // Start listening for a reply
+  const handleStartListening = useCallback((phraseKey: string) => {
+    // [FIX 1] Kill TTS immediately
+    cancelSpeech();
+
+    // [FIX 4] Guard against double-tap race
+    if (isProcessingRef.current) return;
+    isProcessingRef.current = true;
+
+    // [FIX 2] Stop any orphaned session
+    if (speechSessionRef.current) {
+      speechSessionRef.current.stop().catch(() => {});
+      speechSessionRef.current = null;
+      setListeningForReply(null);
+    }
+
+    const langs = {
+      primary: langCode === 'en' ? 'en-US' : 'fil-PH',
+      fallbacks: langCode === 'en' ? [] : ['en-US'],
+    };
+
+    try {
+      startSpeechToText({
+        language: langs.primary,
+        languageFallbacks: langs.fallbacks,
+        restartOnEnd: false,
+        onChunk: (chunk) => {
+          setLiveReplyTranscript(`"${chunk.text}"`);
+        },
+        onError: (msg) => {
+          setLiveReplyTranscript(`Error: ${msg}`);
+          setListeningForReply(null);
+          speechSessionRef.current = null;
+          isProcessingRef.current = false;
+        },
+      }).then(session => {
+        speechSessionRef.current = session;
+        setListeningForReply(phraseKey);
+        setLiveReplyTranscript('Listening... (tap stop to finish)');
+        isProcessingRef.current = false;
+      }).catch(() => {
+        setLiveReplyTranscript('Failed to start mic.');
+        isProcessingRef.current = false;
+      });
+    } catch {
+      setLiveReplyTranscript('Failed to start mic.');
+      isProcessingRef.current = false;
+    }
+  }, [langCode]);
+
+  // Stop listening, translate, and speak back
+  const handleStopAndTranslate = useCallback(async () => {
+    const session = speechSessionRef.current;
+    if (!session) return;
+
+    isProcessingRef.current = true;
+
+    let rawTranscript = '';
+    const currentPhraseKey = listeningForReply;
+
+    try {
+      const result = await session.stop();
+      rawTranscript = result || liveReplyTranscript.replace(/^"|"$/g, '');
+    } catch {
+      rawTranscript = liveReplyTranscript.replace(/^"|"$/g, '');
+    } finally {
+      speechSessionRef.current = null;
+      setListeningForReply(null);
+    }
+
+    if (!rawTranscript || rawTranscript.length < 2) {
+      setLiveReplyTranscript('No speech detected.');
+      isProcessingRef.current = false;
+      return;
+    }
+
+    setLiveReplyTranscript(`Translating...`);
+
+    try {
+      // Determine target language based on user experience (Tourist = English, Local = Filipino)
+      const experience = localStorage.getItem('salintayo_experience');
+      const targetLanguageName = experience === 'local' ? 'Filipino' : 'English';
+
+      const translation = await askOpenRouter([
+        {
+          role: 'system',
+          content: `You are a strict translator. Translate the user's text into ${targetLanguageName}. Output ONLY the translation, nothing else. Do not add explanations, quotes, or any extra text.`,
+        },
+        {
+          role: 'user',
+          content: `Translate this text to ${targetLanguageName}: "${rawTranscript}"`,
+        },
+      ]);
+
+      const clean = translation.trim().replace(/^['"]|['"]$/g, '');
+
+      if (currentPhraseKey) {
+        setReplyTranslations(prev => ({
+          ...prev,
+          [currentPhraseKey]: clean,
+        }));
+      }
+
+      speakText(clean, {
+        onEnd: () => setSpeakingIdx(null),
+        onError: () => setSpeakingIdx(null),
+      });
+
+      setLiveReplyTranscript('✅ Done');
+    } catch {
+      setLiveReplyTranscript('Translation failed.');
+    } finally {
+      isProcessingRef.current = false;
+    }
+  }, [liveReplyTranscript, listeningForReply]);
 
   if (!isOpen) return null;
 
@@ -736,8 +881,33 @@ const EmergencyPhrasesModal: React.FC<EmergencyPhrasesModalProps> = ({ isOpen, o
           <div className="ep-header-text">
             <h2 className="ep-header-title">{selectedCat.label}</h2>
             <p className="ep-header-sub">
-              {selectedCat.phrases.length} phrases · {LANG_LABEL_MAP[langCode] ?? langCode} · tap 🔊 to speak
+              {selectedCat.phrases.length} phrases · {LANG_LABEL_MAP[langCode] ?? langCode}
             </p>
+          </div>
+
+          {/* ── Interpreter Toggle ── */}
+          <div className="ep-header-toggle">
+            <label className="ep-toggle-label">
+              <input
+                type="checkbox"
+                checked={interpreterMode}
+                onChange={(e) => {
+                  setInterpreterMode(e.target.checked);
+                  if (!e.target.checked) {
+                    setReplyTranslations({});
+                    if (speechSessionRef.current) {
+                      speechSessionRef.current.stop().catch(() => {});
+                      speechSessionRef.current = null;
+                    }
+                    setListeningForReply(null);
+                    setLiveReplyTranscript('');
+                    isProcessingRef.current = false;
+                  }
+                }}
+              />
+              <span className="ep-toggle-slider" />
+              <span className="ep-toggle-label-text">2‑Way</span>
+            </label>
           </div>
           <button className="ep-close-btn" onClick={onClose} aria-label="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -752,33 +922,55 @@ const EmergencyPhrasesModal: React.FC<EmergencyPhrasesModalProps> = ({ isOpen, o
             {selectedCat.phrases.map((phrase, i) => {
               const key = `${selectedCat.id}-${i}`;
               const isSpeaking = speakingIdx === key;
+              const isListening = listeningForReply === key;
               const translatedPhrase = getTranslatedPhrase(selectedCat.id, i, phrase);
               const showTranslation = langCode !== 'en' && translatedPhrase !== phrase;
+              const replyText = replyTranslations[key];
               return (
                 <div key={key} className={`ep-phrase ${isSpeaking ? 'ep-phrase--speaking' : ''}`}>
                   <span className="ep-phrase__text">
                     {phrase}
                     {showTranslation && <span className="ep-phrase__translation">{translatedPhrase}</span>}
-                  </span>
-                  <button
-                    className={`ep-phrase__speak ${isSpeaking ? 'ep-phrase__speak--active' : ''}`}
-                    aria-label="Speak phrase"
-                    style={{ '--cat-color': selectedCat.color } as React.CSSProperties}
-                    onClick={() => handleSpeak(translatedPhrase, key)}
-                  >
-                    {isSpeaking ? (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                      </svg>
+                    {replyText && (
+                      <div className="ep-phrase__reply-translation">
+                        <span className="ep-reply-label">🗣️ They said:</span>
+                        <span className="ep-reply-text">"{replyText}"</span>
+                      </div>
                     )}
-                  </button>
+                    {isListening && (
+                      <div className="ep-phrase__listening-status">
+                        <span className="ep-listening-dot" />
+                        {liveReplyTranscript || 'Speak now...'}
+                      </div>
+                    )}
+                  </span>
+                  <div className="ep-phrase__actions">
+                    <button
+                      className={`ep-phrase__speak ${isSpeaking ? 'ep-phrase__speak--active' : ''}`}
+                      aria-label="Speak phrase"
+                      style={{ '--cat-color': selectedCat.color } as React.CSSProperties}
+                      onClick={() => handleSpeak(translatedPhrase, key)}
+                    >
+                      <IonIcon icon={volumeHighOutline} />
+                    </button>
+
+                    {interpreterMode && (
+                      <button
+                        className={`ep-phrase__speak ${isListening ? 'ep-phrase__speak--active' : ''}`}
+                        aria-label={isListening ? 'Stop and translate' : 'Listen for reply'}
+                        style={{ '--cat-color': selectedCat.color } as React.CSSProperties}
+                        onClick={() => {
+                          if (isListening) {
+                            handleStopAndTranslate();
+                          } else {
+                            handleStartListening(key);
+                          }
+                        }}
+                      >
+                        <IonIcon icon={isListening ? stopOutline : micOutline} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

@@ -109,6 +109,19 @@
   z-index: 3;
 }
 
+.chat-header-actions {
+  position: fixed;
+  top: 30px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 90;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.5);
+
+}
+
 .chat-header__brand {
   display: flex;
   align-items: center;
@@ -168,14 +181,6 @@
   height: 8px;
   background: var(--chat-ai-bubble);
   transform: scale(1.1);
-}
-
-.chat-header__divider {
-  border: none;
-  border-top: 1px solid var(--chat-border);
-  margin: 0 0 20px;
-  position: relative;
-  z-index: 3;
 }
 
 /* ===== Chat messages ===== */

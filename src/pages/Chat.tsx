@@ -351,7 +351,6 @@ function getTtsSpeakTextFromAiMessageContent(content: string): string {
   return raw;
 }
 
-// Function to call OpenRouter API
 async function askOpenRouter(
   messages: { role: 'user' | 'assistant'; content: string }[],
   customSystemPrompt?: string,
@@ -380,12 +379,6 @@ async function askOpenRouter(
   }
 
   try {
-    console.log(
-      'OpenRouter API Key loaded:',
-      OPENROUTER_API_KEY ? `${OPENROUTER_API_KEY.substring(0, 10)}...` : 'NOT LOADED'
-    );
-    console.log('Request URL:', OPENROUTER_API_URL);
-
     const response = await fetch(OPENROUTER_API_URL, {
       method: 'POST',
       headers: {
@@ -403,22 +396,16 @@ async function askOpenRouter(
       }),
     });
 
-    console.log('OpenRouter Response Status:', response.status);
-    console.log('OpenRouter Response OK:', response.ok);
-
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('OpenRouter Error Response:', errorData);
       throw new Error(
         errorData.error?.message || `API request failed: ${response.status} - ${JSON.stringify(errorData)}`
       );
     }
 
     const data = await response.json();
-    console.log('OpenRouter Response Data:', JSON.stringify(data, null, 2));
-
     const message = data.choices?.[0]?.message;
-    const content = message?.content || message?.reasoning_details || 'Sorry, I could not generate a response.';
+    const content = message?.content || 'Sorry, I could not generate a response.';
     return content;
   } catch (directError) {
     if (!ENABLE_FUNCTIONS_CHAT_FALLBACK) {
@@ -1941,29 +1928,6 @@ Rules:
             <svg className="hero-wave" viewBox="0 0 430 40" preserveAspectRatio="none">
               <path d="M0,20 C80,40 180,0 280,20 C350,35 400,10 430,18 L430,40 L0,40 Z" fill="#ffffff"/>
             </svg>
-            <div className="chat-header">
-              <button
-                type="button"
-                className="chat-header__hamburger"
-                onClick={() => setIsHistoryOpen(true)}
-                aria-label="Open chat history"
-              >
-                <span /><span /><span />
-              </button>
-              <button
-                type="button"
-                className="chat-header__new-chat-btn"
-                onClick={startNewChat}
-                aria-label="New chat"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="16" />
-                  <line x1="8" y1="12" x2="16" y2="12" />
-                </svg>
-              </button>
-            </div>
-            <hr className="chat-header__divider" />
 
             {/* Emergency Mode Banner */}
             {isEmergencyMode && emergencyDialect && (
@@ -2065,6 +2029,29 @@ Rules:
               </div>
             )}
           </header>
+
+          <div className="chat-header-actions">
+            <button
+              type="button"
+              className="chat-header__hamburger"
+              onClick={() => setIsHistoryOpen(true)}
+              aria-label="Open chat history"
+            >
+              <span /><span /><span />
+            </button>
+            <button
+              type="button"
+              className="chat-header__new-chat-btn"
+              onClick={startNewChat}
+              aria-label="New chat"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="16" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+            </button>
+          </div>
 
           <section className="chat-messages" aria-label="Chat conversation">
             {messages.length === 0 && !isEmergencyMode && (

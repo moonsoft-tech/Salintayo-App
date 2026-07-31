@@ -227,6 +227,9 @@ interface DeepSeekMessage {
   content: string;
 }
 
+/** Hard ceiling regardless of what the client requests — bounds worst-case cost per call. */
+const CHAT_MAX_TOKENS_CEILING = 4096;
+
 /**
  * API: chatCompletion — DeepSeek-V3 chat via OpenAI-compatible API.
  * Requires Firebase auth. Messages are passed through to DeepSeek.
@@ -245,11 +248,15 @@ export const chatCompletion = functions.https.onRequest((req, res) => {
       return;
     }
 
-    const body = req.body as { messages?: DeepSeekMessage[] };
+    const body = req.body as { messages?: DeepSeekMessage[]; maxTokens?: number; temperature?: number };
     if (!Array.isArray(body?.messages) || body.messages.length === 0) {
       res.status(400).json({ error: 'Bad request', message: 'messages array required and must not be empty' });
       return;
     }
+
+    const requestedMaxTokens = typeof body.maxTokens === 'number' && body.maxTokens > 0 ? body.maxTokens : 1000;
+    const maxTokens = Math.min(requestedMaxTokens, CHAT_MAX_TOKENS_CEILING);
+    const temperature = typeof body.temperature === 'number' ? body.temperature : 0.7;
 
     try {
       const apiKey = getDeepSeekApiKey();
@@ -262,8 +269,8 @@ export const chatCompletion = functions.https.onRequest((req, res) => {
         body: JSON.stringify({
           model: 'deepseek-chat',
           messages: body.messages,
-          max_tokens: 2048,
-          temperature: 0.7,
+          max_tokens: maxTokens,
+          temperature,
         }),
       });
 
