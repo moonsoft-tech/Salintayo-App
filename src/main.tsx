@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { getFirebase } from './firebase';
 import { installGlobalHandlers, logBootStep, auditEnvironmentVariables, verifyCriticalAssets, renderDebugPage } from './bootLogger';
+import { installAudioUnlock } from './utils/audioUnlock';
 
 logBootStep('[BOOT 01] main.tsx loaded');
 installGlobalHandlers();
@@ -20,6 +21,7 @@ auditEnvironmentVariables([
 const bootstrap = async () => {
   try {
     logBootStep('[BOOT 01.5] Initializing Firebase');
+    installAudioUnlock();
     getFirebase();
     verifyCriticalAssets(['/manifest.json', '/logo.png']).catch((e) => {
       logBootStep(`[BOOT] verifyCriticalAssets failed non-fatally: ${String(e)}`);

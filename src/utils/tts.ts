@@ -8,6 +8,7 @@
  */
 import { Capacitor } from '@capacitor/core';
 import { QueueStrategy, TextToSpeech } from '@capacitor-community/text-to-speech';
+import { logBootStep } from './bootLogger';
 import { getResolvedDialectLangCode, QCB_DIALECT_LANG_STORAGE_KEY, DIALECT_LANG_STORAGE_KEY } from './dialectPreference';
 
 type DialectCode = string;
@@ -90,6 +91,7 @@ function applyDialectTransform(text: string, rules: DialectRule[]): string {
 let cambAbort: AbortController | null = null;
 let cambAudioEl: HTMLAudioElement | null = null;
 let cambAudioUrl: string | null = null;
+let voicesLoaded = false;
 
 const DIALECT_LABEL: Record<string, string> = {
   en: 'English',
@@ -103,6 +105,34 @@ const DIALECT_LABEL: Record<string, string> = {
   pag: 'Pangasinan',
   tsg: 'Tausug',
 };
+
+async function waitForVoices(timeoutMs = 1000): Promise<SpeechSynthesisVoice[]> {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return [];
+  if (voicesLoaded) return window.speechSynthesis.getVoices();
+
+  const existing = window.speechSynthesis.getVoices();
+  if (existing.length > 0) {
+    voicesLoaded = true;
+    return existing;
+  }
+
+  return new Promise((resolve) => {
+    const onVoices = () => {
+      clearTimeout(timeout);
+      window.speechSynthesis?.removeEventListener('voiceschanged', onVoices);
+      voicesLoaded = true;
+      resolve(window.speechSynthesis?.getVoices() ?? []);
+    };
+
+    const timeout = window.setTimeout(() => {
+      window.speechSynthesis?.removeEventListener('voiceschanged', onVoices);
+      voicesLoaded = true;
+      resolve(window.speechSynthesis?.getVoices() ?? []);
+    }, timeoutMs);
+
+    window.speechSynthesis?.addEventListener('voiceschanged', onVoices);
+  });
+}
 
 function pickVoiceForLocale(locale: string): SpeechSynthesisVoice | null {
   if (typeof window === 'undefined' || !window.speechSynthesis) return null;
@@ -297,6 +327,7 @@ export function speakText(text: string, options?: SpeakTextOptions): void {
       } catch (err) {
         if (signal.aborted) return;
         console.error('Camb TTS error:', err);
+        logBootStep(`[TTS] Camb failed, falling back: ${String(err)}`);
         cambAbort = null;
         cambAudioEl = null;
         if (cambAudioUrl) URL.revokeObjectURL(cambAudioUrl);
@@ -305,14 +336,20 @@ export function speakText(text: string, options?: SpeakTextOptions): void {
         try {
           const locale = getTtsLocale();
           if (Capacitor.isNativePlatform()) {
-            await speakNativeText(trimmed, locale);
-            options?.onEnd?.();
+            try {
+              await speakNativeText(trimmed, locale);
+              options?.onEnd?.();
+            } catch (nativeErr) {
+              logBootStep(`[TTS] native TTS fallback failed: ${String(nativeErr)}`);
+              options?.onError?.();
+            }
             return;
           }
           if (typeof window === 'undefined' || !window.speechSynthesis) {
             options?.onEnd?.();
             return;
           }
+          await waitForVoices();
           window.speechSynthesis.cancel();
           const utter = new SpeechSynthesisUtterance(trimmed);
           utter.lang = locale;
@@ -321,7 +358,8 @@ export function speakText(text: string, options?: SpeakTextOptions): void {
           utter.onend = () => options?.onEnd?.();
           utter.onerror = () => options?.onError?.();
           window.speechSynthesis.speak(utter);
-        } catch {
+        } catch (err) {
+          logBootStep(`[TTS] Web Speech fallback failed: ${String(err)}`);
           options?.onError?.();
         }
       }
@@ -342,18 +380,29 @@ export function speakText(text: string, options?: SpeakTextOptions): void {
     return;
   }
 
-  window.speechSynthesis.cancel();
-  const utter = new SpeechSynthesisUtterance(trimmed);
-  utter.lang = locale;
-  utter.rate = 0.92;
-  utter.pitch = 1;
+  void (async () => {
+    try {
+      await waitForVoices();
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(trimmed);
+      utter.lang = locale;
+      utter.rate = 0.92;
+      utter.pitch = 1;
 
-  const webFallbackLocales = [locale, ...(WEB_LOCALE_FALLBACKS[locale] ?? ['en-US'])];
-  const match = webFallbackLocales.map((l) => pickVoiceForLocale(l)).find(Boolean) ?? null;
-  if (match) utter.voice = match;
-  utter.onend = () => options?.onEnd?.();
-  utter.onerror = () => options?.onError?.();
-  window.speechSynthesis.speak(utter);
+      const webFallbackLocales = [locale, ...(WEB_LOCALE_FALLBACKS[locale] ?? ['en-US'])];
+      const match = webFallbackLocales.map((l) => pickVoiceForLocale(l)).find(Boolean) ?? null;
+      if (match) utter.voice = match;
+      utter.onend = () => options?.onEnd?.();
+      utter.onerror = () => {
+        logBootStep(`[TTS] Web Speech fallback failed: utterance error for locale ${locale}`);
+        options?.onError?.();
+      };
+      window.speechSynthesis.speak(utter);
+    } catch (err) {
+      logBootStep(`[TTS] Web Speech fallback failed: ${String(err)}`);
+      options?.onError?.();
+    }
+  })();
 }
 
 export function cancelSpeech(): void {
