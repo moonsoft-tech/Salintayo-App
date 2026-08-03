@@ -21,7 +21,9 @@ const bootstrap = async () => {
   try {
     logBootStep('[BOOT 01.5] Initializing Firebase');
     getFirebase();
-    await verifyCriticalAssets(['/manifest.json', '/logo.png']);
+    verifyCriticalAssets(['/manifest.json', '/logo.png']).catch((e) => {
+      logBootStep(`[BOOT] verifyCriticalAssets failed non-fatally: ${String(e)}`);
+    });
     logBootStep('[BOOT 02] React createRoot');
     const container = document.getElementById('root');
     if (!container) throw new Error('Root element #root not found');
