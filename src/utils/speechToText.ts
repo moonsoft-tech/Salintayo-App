@@ -149,15 +149,19 @@ export async function startSpeechToText(params: {
         // Always idle the engine first — a hung previous stop bricks later sessions.
         await forceStopNative();
 
+        // Check availability first (simulator fails this)
         const available = await SpeechRecognition.available().catch(() => ({ available: false }));
         if (!available.available) {
-          params.onError?.('Speech-to-Text is not available on this device.');
+          params.onError?.(
+            'Speech recognition is not available on this device. Please test on a real iOS or Android device.'
+          );
           return {
             getTranscript: () => '',
             stop: async () => '',
           };
         }
 
+        // Check and request permissions
         const perm = await SpeechRecognition.checkPermissions().catch(() => ({
           speechRecognition: 'prompt' as const,
         }));
@@ -166,7 +170,7 @@ export async function startSpeechToText(params: {
             speechRecognition: 'denied' as const,
           }));
           if (requested.speechRecognition !== 'granted') {
-            params.onError?.('Microphone/Speech permission denied.');
+            params.onError?.('Microphone permission is required. Please allow microphone access in Settings.');
             return {
               getTranscript: () => '',
               stop: async () => '',
