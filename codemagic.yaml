@@ -1,119 +1,4 @@
 workflows:
-  salintayo-ios-workflow:
-    name: Salintayo iOS Workflow (unsigned)
-    max_build_duration: 120
-    instance_type: mac_mini_m2
-    environment:
-      vars:
-        XCODE_PROJECT: "App.xcodeproj"
-        XCODE_SCHEME: "App"
-      groups:
-        - salintayo_secrets
-      node: 22
-      xcode: latest
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
-        - pattern: NewUpdate3
-          include: true
-    scripts:
-      - name: Install npm dependencies
-        script: |
-          npm ci
-      - name: Build web bundle
-        script: |
-          npm run build
-      - name: Strip crossorigin attribute from built HTML
-        script: |
-          # Vite adds crossorigin to <script>/<link> tags by default. In a
-          # Capacitor iOS WKWebView (capacitor://localhost), this can cause
-          # any runtime JS error to be reported as a generic, useless
-          # "Script error." with no stack trace, because the browser hides
-          # error details for scripts it thinks are cross-origin unless the
-          # response includes matching CORS headers - which Capacitor's
-          # local scheme does not reliably provide. Stripping it here
-          # restores real error messages/stack traces on iOS.
-          sed -i '' 's/ crossorigin//g' dist/index.html
-      - name: Add and sync Capacitor iOS project
-        script: |
-          if [ ! -d ios ]; then
-            npx cap add ios --packagemanager SPM
-          fi
-          npx cap sync ios
-      - name: Configure Firebase, permissions, and Google Sign-In
-        script: |
-          INFO_PLIST="$CM_BUILD_DIR/ios/App/App/Info.plist"
-          GSI_PLIST="$CM_BUILD_DIR/ios/App/App/GoogleService-Info.plist"
-          PB=/usr/libexec/PlistBuddy
-
-          # 1. Write the Firebase native config file.
-          echo "$GOOGLE_SERVICE_INFO_PLIST_BASE64" | base64 --decode > "$GSI_PLIST"
-
-          # 2. Register GoogleService-Info.plist in the Xcode project's Copy Bundle Resources.
-          gem install xcodeproj --no-document
-          ruby -e '
-            require "xcodeproj"
-            project_path = "ios/App/App.xcodeproj"
-            project = Xcodeproj::Project.open(project_path)
-            target = project.targets.first
-            group = project.main_group.find_subpath("App", true)
-            file_ref = group.files.find { |f| f.path == "GoogleService-Info.plist" }
-            unless file_ref
-              file_ref = group.new_reference("GoogleService-Info.plist")
-              target.resources_build_phase.add_file_reference(file_ref)
-              project.save
-              puts "GoogleService-Info.plist added to Xcode project and Copy Bundle Resources."
-            else
-              puts "GoogleService-Info.plist already referenced in Xcode project."
-            end
-          '
-
-          # 3. Add required iOS permission usage descriptions.
-          # Missing any of these causes an instant native crash (not a denied
-          # dialog) the moment the matching API is touched - this is stricter
-          # than Android's runtime permission model.
-          $PB -c "Add :NSCameraUsageDescription string 'Salintayo uses the camera to let you scan and translate text from photos.'" "$INFO_PLIST" 2>/dev/null || true
-          $PB -c "Add :NSPhotoLibraryUsageDescription string 'Salintayo needs photo library access so you can pick images to translate.'" "$INFO_PLIST" 2>/dev/null || true
-          $PB -c "Add :NSPhotoLibraryAddUsageDescription string 'Salintayo needs permission to save images to your photo library.'" "$INFO_PLIST" 2>/dev/null || true
-          $PB -c "Add :NSMicrophoneUsageDescription string 'Salintayo uses the microphone to record your voice for translation.'" "$INFO_PLIST" 2>/dev/null || true
-          $PB -c "Add :NSSpeechRecognitionUsageDescription string 'Salintayo uses speech recognition to transcribe your voice into text.'" "$INFO_PLIST" 2>/dev/null || true
-
-          # 4. Register the Google Sign-In URL scheme, read dynamically from
-          # GoogleService-Info.plist so it can never drift out of sync.
-          REVERSED_CLIENT_ID=$($PB -c "Print :REVERSED_CLIENT_ID" "$GSI_PLIST")
-          if ! $PB -c "Print :CFBundleURLTypes" "$INFO_PLIST" >/dev/null 2>&1; then
-            $PB -c "Add :CFBundleURLTypes array" "$INFO_PLIST"
-            $PB -c "Add :CFBundleURLTypes:0 dict" "$INFO_PLIST"
-            $PB -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$INFO_PLIST"
-            $PB -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REVERSED_CLIENT_ID" "$INFO_PLIST"
-            echo "Google Sign-In URL scheme added: $REVERSED_CLIENT_ID"
-          else
-            echo "CFBundleURLTypes already present, skipping."
-          fi
-      - name: Build unsigned iOS simulator app
-        script: |
-          cd $CM_BUILD_DIR/ios/App
-          xcodebuild build \
-            -project "$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
-            -sdk iphonesimulator \
-            -configuration Debug \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
-    artifacts:
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
-      - /tmp/xcodebuild_logs/*.log
-    publishing:
-      email:
-        recipients:
-          - moonsoft2.0@gmail.com
-        notify:
-          success: true
-          failure: true
   salintayo-ios-device-workflow:
     name: Salintayo iOS Device Workflow (unsigned)
     max_build_duration: 120
@@ -155,9 +40,16 @@ workflows:
       - name: Add and sync Capacitor iOS project
         script: |
           if [ ! -d ios ]; then
-            npx cap add ios --packagemanager SPM
+            npx cap add ios --packagemanager npm
           fi
           npx cap sync ios
+          
+          # Install CocoaPods dependencies for the speech-recognition plugin
+          cd ios/App
+          pod install --repo-update
+          cd ../..
+          
+          echo "✓ iOS project synced with CocoaPods"
       - name: Configure Firebase, permissions, and Google Sign-In
         script: |
           INFO_PLIST="$CM_BUILD_DIR/ios/App/App/Info.plist"

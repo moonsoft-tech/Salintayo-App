@@ -13,7 +13,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { firebaseAuth, firebaseDb } from '../firebase';
 import { speakText, cancelSpeech } from '../utils/tts';
-import { transcribeWhisper, chatWithDeepSeek, type DeepSeekMessage } from '../utils/api';
+import { transcribeWhisper } from '../utils/api';
 import { startSpeechToText, type SpeechToTextSession } from '../utils/speechToText';
 import './WordOfDayModal.css';
 
@@ -45,6 +45,167 @@ interface Props {
 }
 
 type Stage = 'loading' | 'ready' | 'recording' | 'processing' | 'result' | 'error' | 'already-done';
+
+/* ═══════════════════════════════════════════════════════════
+   LOCAL WORD DICTIONARY
+   Hardcoded here so no Firestore collection or seeding is needed.
+   Keyed by dialect code (matches dialectId used throughout the app).
+   ═══════════════════════════════════════════════════════════ */
+const WORD_DICTIONARY: Record<string, WordEntry[]> = {
+  fil: [
+    { word: 'Magandang umaga', meaning: 'Good morning' },
+    { word: 'Salamat', meaning: 'Thank you' },
+    { word: 'Oo', meaning: 'Yes' },
+    { word: 'Hindi', meaning: 'No' },
+    { word: 'Paalam', meaning: 'Goodbye' },
+    { word: 'Kumain', meaning: 'Eat', exampleSentence: 'Kumain ka na ba?' },
+    { word: 'Uminom', meaning: 'Drink', exampleSentence: 'Uminom ka ng tubig.' },
+    { word: 'Ako', meaning: 'I or me', exampleSentence: 'Ako si Juan.' },
+    { word: 'Ikaw', meaning: 'You', exampleSentence: 'Ikaw ay mabait.' },
+    { word: 'Bahay', meaning: 'House', exampleSentence: 'Malaki ang bahay.' },
+    { word: 'Pagkain', meaning: 'Food', exampleSentence: 'Masarap ang pagkain.' },
+    { word: 'Tubig', meaning: 'Water', exampleSentence: 'Uminom ng tubig.' },
+    { word: 'Nanay', meaning: 'Mother', exampleSentence: 'Si Nanay ay nagluto.' },
+    { word: 'Tatay', meaning: 'Father', exampleSentence: 'Si Tatay ay nagtrabaho.' },
+    { word: 'Magkano', meaning: 'How much', exampleSentence: 'Magkano ito?' },
+  ],
+  ceb: [
+    { word: 'Maayong buntag', meaning: 'Good morning' },
+    { word: 'Salamat', meaning: 'Thank you' },
+    { word: 'Oo', meaning: 'Yes' },
+    { word: 'Dili', meaning: 'No' },
+    { word: 'Babay', meaning: 'Goodbye' },
+    { word: 'Kaon', meaning: 'Eat', exampleSentence: 'Kaon na ta.' },
+    { word: 'Inom', meaning: 'Drink', exampleSentence: 'Inom og tubig.' },
+    { word: 'Ako', meaning: 'I or me', exampleSentence: 'Ako si Maria.' },
+    { word: 'Ikaw', meaning: 'You', exampleSentence: 'Ikaw ang akong higala.' },
+    { word: 'Balay', meaning: 'House', exampleSentence: 'Dako ang balay.' },
+    { word: 'Pagkaon', meaning: 'Food', exampleSentence: 'Lami ang pagkaon.' },
+    { word: 'Tubig', meaning: 'Water', exampleSentence: 'Tubig nga mainit.' },
+    { word: 'Nanay', meaning: 'Mother', exampleSentence: 'Si Nanay naa sa balay.' },
+    { word: 'Tatay', meaning: 'Father', exampleSentence: 'Si Tatay nagtrabaho.' },
+    { word: 'Pila', meaning: 'How much', exampleSentence: 'Pila ang presyo?' },
+  ],
+  ilo: [
+    { word: 'Naimbag a bigat', meaning: 'Good morning' },
+    { word: 'Agyamanak', meaning: 'Thank you' },
+    { word: 'Wen', meaning: 'Yes' },
+    { word: 'Saan', meaning: 'No' },
+    { word: 'Pakada', meaning: 'Goodbye' },
+    { word: 'Mangan', meaning: 'Eat', exampleSentence: 'Mangan tayo.' },
+    { word: 'Aginom', meaning: 'Drink', exampleSentence: 'Aginom ka ti danum.' },
+    { word: 'Siak', meaning: 'I or me', exampleSentence: 'Siak ni Juan.' },
+    { word: 'Sika', meaning: 'You', exampleSentence: 'Sika ti nalaing.' },
+    { word: 'Balay', meaning: 'House', exampleSentence: 'Dakkel ti balay.' },
+    { word: 'Taraon', meaning: 'Food', exampleSentence: 'Naimas ti taraon.' },
+    { word: 'Danum', meaning: 'Water', exampleSentence: 'Danum ti inumen.' },
+    { word: 'Ina', meaning: 'Mother', exampleSentence: 'Ni Ina ket nagluto.' },
+    { word: 'Ama', meaning: 'Father', exampleSentence: 'Ni Ama ket nagtrabaho.' },
+    { word: 'Sagmamano', meaning: 'How much', exampleSentence: 'Sagmamano daytoy?' },
+  ],
+  hil: [
+    { word: 'Maayong aga', meaning: 'Good morning' },
+    { word: 'Salamat', meaning: 'Thank you' },
+    { word: 'Huo', meaning: 'Yes' },
+    { word: 'Indi', meaning: 'No' },
+    { word: 'Paalam', meaning: 'Goodbye' },
+    { word: 'Kaon', meaning: 'Eat', exampleSentence: 'Kaon na kita.' },
+    { word: 'Inom', meaning: 'Drink', exampleSentence: 'Inom sang tubig.' },
+    { word: 'Ako', meaning: 'I or me', exampleSentence: 'Ako si Pedro.' },
+    { word: 'Ikaw', meaning: 'You', exampleSentence: 'Ikaw ang maayo.' },
+    { word: 'Balay', meaning: 'House', exampleSentence: 'Dako ang balay.' },
+    { word: 'Pagkaon', meaning: 'Food', exampleSentence: 'Namit ang pagkaon.' },
+    { word: 'Tubig', meaning: 'Water', exampleSentence: 'Tubig nga mainit.' },
+    { word: 'Nanay', meaning: 'Mother', exampleSentence: 'Si Nanay naga-luto.' },
+    { word: 'Tatay', meaning: 'Father', exampleSentence: 'Si Tatay naga-trabaho.' },
+    { word: 'Pila', meaning: 'How much', exampleSentence: 'Pila ini?' },
+  ],
+  war: [
+    { word: 'Maupay nga aga', meaning: 'Good morning' },
+    { word: 'Salamat', meaning: 'Thank you' },
+    { word: 'Oo', meaning: 'Yes' },
+    { word: 'Diri', meaning: 'No' },
+    { word: 'Paalam', meaning: 'Goodbye' },
+    { word: 'Kaon', meaning: 'Eat', exampleSentence: 'Kaon na kita.' },
+    { word: 'Inom', meaning: 'Drink', exampleSentence: 'Inom hin tubig.' },
+    { word: 'Ako', meaning: 'I or me', exampleSentence: 'Ako hi Maria.' },
+    { word: 'Ikaw', meaning: 'You', exampleSentence: 'Ikaw an akon higala.' },
+    { word: 'Balay', meaning: 'House', exampleSentence: 'Dako an balay.' },
+    { word: 'Pagkaon', meaning: 'Food', exampleSentence: 'Lami an pagkaon.' },
+    { word: 'Tubig', meaning: 'Water', exampleSentence: 'Tubig nga mainit.' },
+    { word: 'Nanay', meaning: 'Mother', exampleSentence: 'Hi Nanay nagluto.' },
+    { word: 'Tatay', meaning: 'Father', exampleSentence: 'Hi Tatay nagtrabaho.' },
+    { word: 'Pira', meaning: 'How much', exampleSentence: 'Pira ini?' },
+  ],
+  bik: [
+    { word: 'Marhay na aga', meaning: 'Good morning' },
+    { word: 'Salamat', meaning: 'Thank you' },
+    { word: 'Iyo', meaning: 'Yes' },
+    { word: 'Dae', meaning: 'No' },
+    { word: 'Paaram', meaning: 'Goodbye' },
+    { word: 'Kakan', meaning: 'Eat', exampleSentence: 'Kakan na kita.' },
+    { word: 'Inom', meaning: 'Drink', exampleSentence: 'Inom nin tubig.' },
+    { word: 'Ako', meaning: 'I or me', exampleSentence: 'Ako si Juan.' },
+    { word: 'Ika', meaning: 'You', exampleSentence: 'Ika an sakuyang amigo.' },
+    { word: 'Harong', meaning: 'House', exampleSentence: 'Dakula an harong.' },
+    { word: 'Pagkakan', meaning: 'Food', exampleSentence: 'Masiram an pagkakan.' },
+    { word: 'Tubig', meaning: 'Water', exampleSentence: 'Tubig na mainit.' },
+    { word: 'Nanay', meaning: 'Mother', exampleSentence: 'Si Nanay nagluto.' },
+    { word: 'Tatay', meaning: 'Father', exampleSentence: 'Si Tatay nagtrabaho.' },
+    { word: 'Pira', meaning: 'How much', exampleSentence: 'Pira ini?' },
+  ],
+  pam: [
+    { word: 'Mayap a abak', meaning: 'Good morning' },
+    { word: 'Salamat', meaning: 'Thank you' },
+    { word: 'Wa', meaning: 'Yes' },
+    { word: 'Ali', meaning: 'No' },
+    { word: 'Paalam', meaning: 'Goodbye' },
+    { word: 'Mangan', meaning: 'Eat', exampleSentence: 'Mangan na tayo.' },
+    { word: 'Minum', meaning: 'Drink', exampleSentence: 'Minum kang danum.' },
+    { word: 'Aku', meaning: 'I or me', exampleSentence: 'Aku y Juan.' },
+    { word: 'Ika', meaning: 'You', exampleSentence: 'Ika y masanting.' },
+    { word: 'Bale', meaning: 'House', exampleSentence: 'Maragul ing bale.' },
+    { word: 'Pamangan', meaning: 'Food', exampleSentence: 'Manyaman ing pamangan.' },
+    { word: 'Danum', meaning: 'Water', exampleSentence: 'Danum a malinis.' },
+    { word: 'Indu', meaning: 'Mother', exampleSentence: 'Ing Indu ku maglutu.' },
+    { word: 'Ama', meaning: 'Father', exampleSentence: 'Ing Ama ku magobra.' },
+    { word: 'Magkanu', meaning: 'How much', exampleSentence: 'Magkanu ini?' },
+  ],
+  pag: [
+    { word: 'Maabig ya kabwasan', meaning: 'Good morning' },
+    { word: 'Salamat', meaning: 'Thank you' },
+    { word: 'On', meaning: 'Yes' },
+    { word: 'Andi', meaning: 'No' },
+    { word: 'Paalam', meaning: 'Goodbye' },
+    { word: 'Mangan', meaning: 'Eat', exampleSentence: 'Mangan tayo.' },
+    { word: 'Inom', meaning: 'Drink', exampleSentence: 'Inom ka na danum.' },
+    { word: 'Siak', meaning: 'I or me', exampleSentence: 'Siak si Juan.' },
+    { word: 'Sika', meaning: 'You', exampleSentence: 'Sika so matalino.' },
+    { word: 'Abong', meaning: 'House', exampleSentence: 'Baleg so abong.' },
+    { word: 'Panangan', meaning: 'Food', exampleSentence: 'Maserbi so panangan.' },
+    { word: 'Danum', meaning: 'Water', exampleSentence: 'Danum ya malinis.' },
+    { word: 'Ina', meaning: 'Mother', exampleSentence: 'Si Ina so nangluto.' },
+    { word: 'Ama', meaning: 'Father', exampleSentence: 'Si Ama so nan-gobra.' },
+    { word: 'Piga', meaning: 'How much', exampleSentence: 'Piga so presyo?' },
+  ],
+  tsg: [
+    { word: 'Sambut', meaning: 'Hello or greeting' },
+    { word: 'Magsukul', meaning: 'Thank you' },
+    { word: 'Hap', meaning: 'Yes' },
+    { word: 'Di', meaning: 'No' },
+    { word: 'Paalam', meaning: 'Goodbye' },
+    { word: 'Makan', meaning: 'Eat', exampleSentence: 'Makan na kita.' },
+    { word: 'Minum', meaning: 'Drink', exampleSentence: 'Minum asin tubig.' },
+    { word: 'Aku', meaning: 'I or me', exampleSentence: 'Aku hi Hassan.' },
+    { word: 'Ikaw', meaning: 'You', exampleSentence: 'Ikaw bagay.' },
+    { word: 'Bāy', meaning: 'House', exampleSentence: 'Dakula bāy.' },
+    { word: 'Pagkan', meaning: 'Food', exampleSentence: 'Makatas pagkan.' },
+    { word: 'Tubig', meaning: 'Water', exampleSentence: 'Tubig ini.' },
+    { word: 'Ina', meaning: 'Mother' },
+    { word: 'Ama', meaning: 'Father' },
+    { word: 'Pila', meaning: 'How much', exampleSentence: 'Pila ini?' },
+  ],
+};
 
 /* ═══════════════════════════════════════════════════════════
    HELPERS
@@ -89,60 +250,37 @@ function cacheWordSet(dialectId: string, dateKey: string, entries: WordEntry[]):
   } catch { /* ignore */ }
 }
 
-async function generateWordOfDayViaAI(dialectId: string, dialectName: string): Promise<WordEntry[]> {
-  const systemPrompt = `You are a Philippine dialect tutor generating a "Word of the Day" list for a pronunciation-practice feature.
-Generate THREE common, useful, beginner-friendly words or short phrases in the ${dialectName} dialect (dialect code: ${dialectId}).
-Avoid obscure, offensive, or overly complex entries — pick things a beginner would realistically use in everyday conversation.
-Return ONLY valid JSON, no markdown fences, no extra text, in this exact shape:
-{ "words": [
-  { "word": "...", "meaning": "short English meaning", "exampleSentence": "a simple example sentence using the word" },
-  { "word": "...", "meaning": "short English meaning", "exampleSentence": "a simple example sentence using the word" },
-  { "word": "...", "meaning": "short English meaning", "exampleSentence": "a simple example sentence using the word" }
-] }`;
+/** Looks up the full word list for a dialect from the local dictionary above. */
+function getWordListForDialect(dialectId: string): WordEntry[] {
+  return WORD_DICTIONARY[dialectId] ?? [];
+}
 
-  const userPrompt = `Give me today's Word of the Day set for ${dialectName}. Pick three useful beginner entries, with one main word and two bonus words or phrases.`;
-
-  const messages: DeepSeekMessage[] = [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt },
-  ];
-
-  const rawText = await chatWithDeepSeek(messages);
-  const cleaned = rawText.replace(/```json|```/gi, '').trim();
-  const parsed = JSON.parse(cleaned) as { words?: WordEntry[]; word?: string; meaning?: string; exampleSentence?: string };
-  const entries: WordEntry[] = [];
-
-  if (Array.isArray(parsed.words) && parsed.words.length > 0) {
-    parsed.words.forEach((entry) => {
-      if (entry?.word) {
-        entries.push({
-          word: String(entry.word),
-          meaning: String(entry.meaning ?? ''),
-          exampleSentence: entry.exampleSentence ? String(entry.exampleSentence) : undefined,
-        });
-      }
-    });
+/** Deterministically picks today's word set from the full dictionary list —
+ *  same result for every user, every device, until the date changes.
+ *  No AI call, no per-user cost, no Firestore write needed to "assign" it. */
+function pickTodaysWordSet(allWords: WordEntry[], dateKey: string, count = 3): WordEntry[] {
+  if (allWords.length === 0) return [];
+  const startIndex = hashString(dateKey) % allWords.length;
+  const picked: WordEntry[] = [];
+  const take = Math.min(count, allWords.length);
+  for (let i = 0; i < take; i++) {
+    picked.push(allWords[(startIndex + i) % allWords.length]);
   }
-
-  if (entries.length === 0 && parsed?.word) {
-    entries.push({
-      word: String(parsed.word),
-      meaning: String(parsed.meaning ?? ''),
-      exampleSentence: parsed.exampleSentence ? String(parsed.exampleSentence) : undefined,
-    });
-  }
-
-  if (entries.length === 0) throw new Error('AI did not return a valid word set.');
-  return entries.slice(0, 3);
+  return picked;
 }
 
 export async function getOrGenerateWordOfDay(dialectId: string, dialectName: string): Promise<WordEntry[]> {
   const dateKey = todayKey();
   const cached = loadCachedWordSet(dialectId, dateKey);
   if (cached) return cached;
-  const generated = await generateWordOfDayViaAI(dialectId, dialectName);
-  cacheWordSet(dialectId, dateKey, generated);
-  return generated;
+
+  const allWords = getWordListForDialect(dialectId);
+  if (allWords.length === 0) {
+    throw new Error(`No words available yet for ${dialectName}. Please check back soon.`);
+  }
+  const picked = pickTodaysWordSet(allWords, dateKey, 3);
+  cacheWordSet(dialectId, dateKey, picked);
+  return picked;
 }
 
 /** Normalizes text for comparison: lowercase, strip punctuation/diacritics/extra spaces. */
@@ -302,7 +440,7 @@ const WordOfDayModal: React.FC<Props> = ({
           }
         }
 
-        // 2) Get (or generate) today's word set for this dialect via AI.
+        // 2) Get today's word set for this dialect from the local dictionary.
         const picked = await getOrGenerateWordOfDay(dialectId, dialectName);
         if (cancelled) return;
         setWordEntries(picked);

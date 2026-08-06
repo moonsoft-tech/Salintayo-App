@@ -112,7 +112,7 @@ const culturalCards = [
   },
   {
     id: 'english',
-    image: '/Images/Manila.jpg',
+    image: '/Images/English.jpg',
     tag: 'English',
     tagColor: '#1e40af',
     title: 'English',

@@ -33,6 +33,67 @@ export type SpeechToTextSession = {
   getTranscript: () => string;
 };
 
+/**
+ * On iOS, show an alert if the permission dialog doesn't appear.
+ * This helps diagnose permission issues since iOS permission dialogs are system-level.
+ */
+async function requestMicPermissionWithFallback(): Promise<boolean> {
+  console.log('[STT] Requesting microphone permission...');
+  
+  try {
+    const permCheckResult = await SpeechRecognition.checkPermissions().catch(err => {
+      console.warn('[STT] checkPermissions error:', err);
+      return { speechRecognition: 'prompt' as const };
+    });
+    
+    console.log('[STT] Check result:', permCheckResult);
+    
+    if (permCheckResult.speechRecognition === 'granted') {
+      console.log('[STT] Microphone already permitted');
+      return true;
+    }
+    
+    if (permCheckResult.speechRecognition !== 'prompt') {
+      console.log('[STT] Permission previously denied or restricted');
+      // Show alert with instructions to enable in Settings
+      alert(
+        'Microphone Permission Required\n\n' +
+        'SalinTayo needs microphone access.\n\n' +
+        'Please:\n' +
+        '1. Go to Settings → Privacy → Microphone\n' +
+        '2. Find "SalinTayo" in the list\n' +
+        '3. Toggle it ON\n\n' +
+        'Then try again.'
+      );
+      return false;
+    }
+    
+    // Request permission
+    const requestResult = await SpeechRecognition.requestPermissions().catch(err => {
+      console.error('[STT] requestPermissions error:', err);
+      throw err;
+    });
+    
+    console.log('[STT] Request result:', requestResult);
+    
+    if (requestResult.speechRecognition === 'granted') {
+      console.log('[STT] Microphone permission granted');
+      return true;
+    }
+    
+    console.log('[STT] Permission not granted:', requestResult.speechRecognition);
+    return false;
+  } catch (err) {
+    console.error('[STT] Permission request exception:', err);
+    alert(
+      'Unable to Request Microphone\n\n' +
+      'Please enable microphone access in Settings:\n' +
+      'Settings → Privacy → Microphone → SalinTayo'
+    );
+    return false;
+  }
+}
+
 /** Serialize native STT sessions so stop/start never overlap and brick the mic. */
 let nativeQueue: Promise<unknown> = Promise.resolve();
 
@@ -80,7 +141,10 @@ async function forceStopNative(timeoutMs = 900): Promise<void> {
 }
 
 export function speechToTextIsSupported(): { supported: boolean; reason?: string } {
-  if (Capacitor.isNativePlatform()) return { supported: true };
+  if (Capacitor.isNativePlatform()) {
+    console.log('[STT] Running on native platform');
+    return { supported: true };
+  }
 
   const isLocalhost =
     location.hostname === 'localhost' ||
@@ -162,14 +226,19 @@ export async function startSpeechToText(params: {
         }
 
         // Check and request permissions
-        const perm = await SpeechRecognition.checkPermissions().catch(() => ({
-          speechRecognition: 'prompt' as const,
-        }));
+        let perm: { speechRecognition?: string };
+        try {
+          perm = await SpeechRecognition.checkPermissions();
+          console.log('[STT] checkPermissions result:', perm);
+        } catch (err) {
+          console.error('[STT] checkPermissions failed:', err);
+          perm = { speechRecognition: 'prompt' };
+        }
+
         if (perm.speechRecognition !== 'granted') {
-          const requested = await SpeechRecognition.requestPermissions().catch(() => ({
-            speechRecognition: 'denied' as const,
-          }));
-          if (requested.speechRecognition !== 'granted') {
+          console.log('[STT] Permission not granted, requesting...');
+          const permissionGranted = await requestMicPermissionWithFallback();
+          if (!permissionGranted) {
             params.onError?.('Microphone permission is required. Please allow microphone access in Settings.');
             return {
               getTranscript: () => '',

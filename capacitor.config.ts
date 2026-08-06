@@ -13,6 +13,10 @@ const config: CapacitorConfig = {
         twitter: false,
       },
     },
+    SpeechRecognition: {
+      maxResults: 5,
+      language: 'en-US',
+    },
   },
 };
 

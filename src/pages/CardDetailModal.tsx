@@ -1143,10 +1143,6 @@ const CardDetailModal: React.FC<CardDetailModalProps> = ({
         className={`cdm-sheet cdm-sheet--draggable${animating ? ' cdm-sheet--in' : ''}${snap === 'full' ? ' cdm-sheet--full' : ''}`}
         style={{ maxHeight: `${sheetHeight}dvh` }}
         onClick={e => e.stopPropagation()}
-        onMouseDown={e => handleDragStart(e.clientY)}
-        onMouseUp={e => handleDragEnd(e.clientY)}
-        onTouchStart={e => handleDragStart(e.touches[0].clientY)}
-        onTouchEnd={e => handleDragEnd(e.changedTouches[0].clientY)}
       >
         {/* ── Drag handle ── */}
         <div
@@ -1156,6 +1152,10 @@ const CardDetailModal: React.FC<CardDetailModalProps> = ({
           tabIndex={0}
           onClick={e => { e.stopPropagation(); onClose(); }}
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') onClose(); }}
+          onMouseDown={e => handleDragStart(e.clientY)}
+          onMouseUp={e => handleDragEnd(e.clientY)}
+          onTouchStart={e => handleDragStart(e.touches[0].clientY)}
+          onTouchEnd={e => handleDragEnd(e.changedTouches[0].clientY)}
         >
           <span className="cdm-drag-handle__bar" />
           <span className="cdm-drag-handle__hint">
@@ -1187,8 +1187,8 @@ const CardDetailModal: React.FC<CardDetailModalProps> = ({
           {/* OVERVIEW */}
           {activeTab === 'overview' && (
             <div className="cdm-tab-panel">
-              <div style={{ width: '100%', height: '240px', borderRadius: '12px', overflow: 'hidden', marginBottom: '8px' }}>
-                <CulturalContextImage src={card.image} alt={card.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} loading="lazy" />
+              <div style={{ width: '100%', borderRadius: '12px', overflow: 'hidden', marginBottom: '8px' }}>
+                <CulturalContextImage src={card.image} alt={card.title} style={{ width: '100%', height: 'auto', display: 'block' }} loading="lazy" />
               </div>
               <p className="cdm-desc">{card.desc}</p>
 

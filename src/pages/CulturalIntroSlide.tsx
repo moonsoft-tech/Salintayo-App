@@ -1,6 +1,8 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import { IonPage, IonContent, useIonViewWillEnter } from '@ionic/react';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Capacitor } from '@capacitor/core';
 import { LANGUAGES, Language } from './LanguageModal';
 import { setHasSeenWelcome } from '../utils/welcomeStorage';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,7 +30,7 @@ const CULTURAL_MAP: Record<string, CulturalData> = {
     ],
   },
   en: {
-    imageUrl: 'Images/Manila.jpg',
+    imageUrl: 'Images/Enlish.jpg',
     imageAlt: 'Manila skyline',
     description:
       'English is an official language of the Philippines — the language of law, higher education, and business, woven together with Filipino in everyday life across the islands.',
@@ -106,6 +108,64 @@ const GLOBE = (
   </svg>
 );
 
+/**
+ * Smooth scroll with easing using requestAnimationFrame
+ */
+function smoothScrollTo(
+  element: HTMLElement | null,
+  target: HTMLElement | null,
+  duration: number = 400
+): Promise<void> {
+  return new Promise((resolve) => {
+    if (!element || !target) {
+      resolve();
+      return;
+    }
+
+    const start = element.scrollTop;
+    const elTop = target.offsetTop;
+    const elHeight = target.offsetHeight;
+    const end = Math.max(0, elTop - window.innerHeight / 2 + elHeight / 2);
+    const distance = end - start;
+
+    if (Math.abs(distance) < 1) {
+      resolve();
+      return;
+    }
+
+    const startTime = performance.now();
+
+    const easeInOutCubic = (t: number) => {
+      return t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1;
+    };
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easeProgress = easeInOutCubic(progress);
+      element.scrollTop = start + distance * easeProgress;
+
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        resolve();
+      }
+    };
+
+    requestAnimationFrame(animate);
+  });
+}
+
+/**
+ * Trigger iOS haptic feedback (safe fallback for web)
+ */
+async function triggerHaptic(style: 'light' | 'medium' | 'heavy' = 'medium') {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await Haptics.impact({ style: style as ImpactStyle });
+  } catch {}
+}
+
 /* ─── Component ─────────────────────────────────────────── */
 export default function CulturalIntroSlide({ initialLanguageCode, onContinue }: Props) {
   const history = useHistory();
@@ -116,6 +176,10 @@ export default function CulturalIntroSlide({ initialLanguageCode, onContinue }: 
   const [selectedCode, setSelectedCode] = useState<string | null>(initialLanguageCode ?? null);
   const [tappedCode, setTappedCode] = useState<string | null>(null);
   const [cardVisible, setCardVisible] = useState(!!initialLanguageCode);
+  const [imageLoading, setImageLoading] = useState(true);
+  
+  // Use ref to track animation in progress to prevent overlapping
+  const animationInProgressRef = useRef(false);
 
   const selectedLang = LANGUAGES.find(l => l.code === selectedCode) ?? null;
   const culturalData = selectedCode ? CULTURAL_MAP[selectedCode] ?? null : null;
@@ -138,32 +202,41 @@ export default function CulturalIntroSlide({ initialLanguageCode, onContinue }: 
 
   const handleSelect = useCallback(
     (lang: Language) => {
+      if (animationInProgressRef.current) return; // Prevent overlapping animations
+      
+      void triggerHaptic('light');
+      
       setTappedCode(lang.code);
-      setTimeout(() => setTappedCode(null), 300);
+      setTimeout(() => setTappedCode(null), 150); // Shorter tap feedback
 
       if (lang.code === selectedCode) return;
 
+      animationInProgressRef.current = true;
+      
+      // Fade out card
       setCardVisible(false);
       syncToStorage(lang);
+      setImageLoading(true);
+
+      // Update selection with smooth orchestration
       setTimeout(() => {
         setSelectedCode(lang.code);
         setCardVisible(true);
+        
+        // Scroll after card is visible
         setTimeout(() => {
-          if (cultureRef.current && contentRef.current) {
-            const el = cultureRef.current;
-            const elTop = el.offsetTop;
-            const elHeight = el.offsetHeight;
-            const scrollTarget = elTop - window.innerHeight / 2 + elHeight / 2;
-            contentRef.current.scrollToPoint(0, Math.max(0, scrollTarget), 400);
-          }
-        }, 50);
-      }, 200);
+          void smoothScrollTo(contentRef.current?.querySelector('ion-content') as HTMLElement, cultureRef.current, 400).finally(() => {
+            animationInProgressRef.current = false;
+          });
+        }, 100);
+      }, 150);
     },
     [selectedCode]
   );
 
   const handleContinue = () => {
     if (!selectedLang) return;
+    void triggerHaptic('heavy');
     syncToStorage(selectedLang);
     setHasSeenWelcome(user?.uid);
     if (onContinue) {
@@ -213,7 +286,15 @@ export default function CulturalIntroSlide({ initialLanguageCode, onContinue }: 
               {selectedCode && culturalData && selectedLang && (
                 <div className={`ci-card ${cardVisible ? 'ci-card--visible' : 'ci-card--hidden'}`}>
                   <div className="ci-card-img-wrap">
-                    <img className="ci-card-img" src={culturalData.imageUrl} alt={culturalData.imageAlt} loading="lazy" />
+                    {imageLoading && <div className="ci-card-img-skeleton" />}
+                    <img
+                      className={`ci-card-img ${!imageLoading ? 'ci-card-img--loaded' : ''}`}
+                      src={culturalData.imageUrl}
+                      alt={culturalData.imageAlt}
+                      loading="lazy"
+                      onLoad={() => setImageLoading(false)}
+                      onError={() => setImageLoading(false)}
+                    />
                     <div className="ci-card-img-grad" />
                     <div className="ci-card-region-pill">
                       <span className="ci-region-dot" style={{ background: selectedLang.gradient }} />

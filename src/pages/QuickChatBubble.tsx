@@ -629,8 +629,7 @@ const EmergencyPhrasesModal: React.FC<EmergencyPhrasesModalProps> = ({ isOpen, o
   const [selectedCat, setSelectedCat] = useState<EpCategory | null>(null);
   const [speakingIdx, setSpeakingIdx] = useState<string | null>(null);
 
-  // --- Interpreter Mode States ---
-  const [interpreterMode, setInterpreterMode] = useState(false);
+  // --- Interpreter Mode States (always on) ---
   const [listeningForReply, setListeningForReply] = useState<string | null>(null);
   const [replyTranslations, setReplyTranslations] = useState<Record<string, string>>({});
   const [liveReplyTranscript, setLiveReplyTranscript] = useState('');
@@ -885,30 +884,6 @@ const EmergencyPhrasesModal: React.FC<EmergencyPhrasesModalProps> = ({ isOpen, o
             </p>
           </div>
 
-          {/* ── Interpreter Toggle ── */}
-          <div className="ep-header-toggle">
-            <label className="ep-toggle-label">
-              <input
-                type="checkbox"
-                checked={interpreterMode}
-                onChange={(e) => {
-                  setInterpreterMode(e.target.checked);
-                  if (!e.target.checked) {
-                    setReplyTranslations({});
-                    if (speechSessionRef.current) {
-                      speechSessionRef.current.stop().catch(() => {});
-                      speechSessionRef.current = null;
-                    }
-                    setListeningForReply(null);
-                    setLiveReplyTranscript('');
-                    isProcessingRef.current = false;
-                  }
-                }}
-              />
-              <span className="ep-toggle-slider" />
-              <span className="ep-toggle-label-text">2‑Way</span>
-            </label>
-          </div>
           <button className="ep-close-btn" onClick={onClose} aria-label="Close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -954,22 +929,20 @@ const EmergencyPhrasesModal: React.FC<EmergencyPhrasesModalProps> = ({ isOpen, o
                       <IonIcon icon={volumeHighOutline} />
                     </button>
 
-                    {interpreterMode && (
-                      <button
-                        className={`ep-phrase__speak ${isListening ? 'ep-phrase__speak--active' : ''}`}
-                        aria-label={isListening ? 'Stop and translate' : 'Listen for reply'}
-                        style={{ '--cat-color': selectedCat.color } as React.CSSProperties}
-                        onClick={() => {
-                          if (isListening) {
-                            handleStopAndTranslate();
-                          } else {
-                            handleStartListening(key);
-                          }
-                        }}
-                      >
-                        <IonIcon icon={isListening ? stopOutline : micOutline} />
-                      </button>
-                    )}
+                    <button
+                      className={`ep-phrase__speak ${isListening ? 'ep-phrase__speak--active' : ''}`}
+                      aria-label={isListening ? 'Stop and translate' : 'Listen for reply'}
+                      style={{ '--cat-color': selectedCat.color } as React.CSSProperties}
+                      onClick={() => {
+                        if (isListening) {
+                          handleStopAndTranslate();
+                        } else {
+                          handleStartListening(key);
+                        }
+                      }}
+                    >
+                      <IonIcon icon={isListening ? stopOutline : micOutline} />
+                    </button>
                   </div>
                 </div>
               );
