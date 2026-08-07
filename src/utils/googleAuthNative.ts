@@ -3,6 +3,7 @@ import { GoogleAuthProvider, signInWithCredential, type User } from 'firebase/au
 import { firebaseAuth } from '../firebase';
 
 const webClientId = import.meta.env.VITE_GOOGLE_WEB_CLIENT_ID as string | undefined;
+const iosClientId = import.meta.env.VITE_GOOGLE_IOS_CLIENT_ID as string | undefined;
 
 let socialLoginReady = false;
 
@@ -45,10 +46,11 @@ export async function signInWithGoogleNative(): Promise<User> {
     );
   }
 
-  if (!socialLoginReady) {
+if (!socialLoginReady) {
     await SocialLogin.initialize({
       google: {
         webClientId: webClientId.trim(),
+        iOSClientId: iosClientId?.trim(),
         mode: 'online',
       },
     });
