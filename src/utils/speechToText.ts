@@ -213,26 +213,13 @@ export async function startSpeechToText(params: {
         // Always idle the engine first — a hung previous stop bricks later sessions.
         await forceStopNative();
 
-        // Check availability first. `available: false` here does NOT only mean
-        // "you're in the Simulator" — on a real device it most commonly means
-        // iOS's on-device dictation engine is turned off at the OS level
-        // (Settings → General → Keyboard → Enable Dictation), or Screen Time
-        // Content & Privacy Restrictions are blocking it. It has nothing to do
-        // with this app's own permissions in that case.
-        const available = await SpeechRecognition.available().catch(() => ({ available: false }));
-        if (!available.available) {
-          params.onError?.(
-            'Speech recognition isn\'t available right now. On a real device, check Settings → General → ' +
-              'Keyboard → Enable Dictation is turned on (and that Screen Time restrictions aren\'t blocking it). ' +
-              'This only happens in the iOS Simulator otherwise.'
-          );
-          return {
-            getTranscript: () => '',
-            stop: async () => '',
-          };
-        }
-
-        // Check and request permissions
+        // Check and request permissions FIRST. This must happen before the
+        // available() check below: available() reflects on-device dictation
+        // engine readiness (Settings → General → Keyboard → Enable Dictation),
+        // which is unrelated to app-level authorization. If the permission
+        // request is gated behind available() === true, iOS never even logs
+        // this app under Settings → Speech Recognition / Microphone, and the
+        // user never sees a system permission prompt at all.
         let perm: { speechRecognition?: string };
         try {
           perm = await SpeechRecognition.checkPermissions();
@@ -252,6 +239,25 @@ export async function startSpeechToText(params: {
               stop: async () => '',
             };
           }
+        }
+
+        // Now check availability — after permission is settled, this reflects
+        // real device/engine readiness. `available: false` here does NOT only
+        // mean "you're in the Simulator" — on a real device it most commonly
+        // means iOS's on-device dictation engine is turned off at the OS level
+        // (Settings → General → Keyboard → Enable Dictation), or Screen Time
+        // Content & Privacy Restrictions are blocking it.
+        const available = await SpeechRecognition.available().catch(() => ({ available: false }));
+        if (!available.available) {
+          params.onError?.(
+            'Speech recognition isn\'t available right now. On a real device, check Settings → General → ' +
+              'Keyboard → Enable Dictation is turned on (and that Screen Time restrictions aren\'t blocking it). ' +
+              'This only happens in the iOS Simulator otherwise.'
+          );
+          return {
+            getTranscript: () => '',
+            stop: async () => '',
+          };
         }
 
         partialHandle = await SpeechRecognition.addListener(
