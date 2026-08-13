@@ -39,20 +39,20 @@ export type SpeechToTextSession = {
  */
 async function requestMicPermissionWithFallback(): Promise<boolean> {
   console.log('[STT] Requesting microphone permission...');
-  
+
   try {
     const permCheckResult = await SpeechRecognition.checkPermissions().catch(err => {
       console.warn('[STT] checkPermissions error:', err);
       return { speechRecognition: 'prompt' as const };
     });
-    
+
     console.log('[STT] Check result:', permCheckResult);
-    
+
     if (permCheckResult.speechRecognition === 'granted') {
       console.log('[STT] Microphone already permitted');
       return true;
     }
-    
+
     if (permCheckResult.speechRecognition !== 'prompt') {
       console.log('[STT] Permission previously denied or restricted');
       // Show alert with instructions to enable in Settings
@@ -67,20 +67,20 @@ async function requestMicPermissionWithFallback(): Promise<boolean> {
       );
       return false;
     }
-    
+
     // Request permission
     const requestResult = await SpeechRecognition.requestPermissions().catch(err => {
       console.error('[STT] requestPermissions error:', err);
       throw err;
     });
-    
+
     console.log('[STT] Request result:', requestResult);
-    
+
     if (requestResult.speechRecognition === 'granted') {
       console.log('[STT] Microphone permission granted');
       return true;
     }
-    
+
     console.log('[STT] Permission not granted:', requestResult.speechRecognition);
     return false;
   } catch (err) {
@@ -213,11 +213,18 @@ export async function startSpeechToText(params: {
         // Always idle the engine first — a hung previous stop bricks later sessions.
         await forceStopNative();
 
-        // Check availability first (simulator fails this)
+        // Check availability first. `available: false` here does NOT only mean
+        // "you're in the Simulator" — on a real device it most commonly means
+        // iOS's on-device dictation engine is turned off at the OS level
+        // (Settings → General → Keyboard → Enable Dictation), or Screen Time
+        // Content & Privacy Restrictions are blocking it. It has nothing to do
+        // with this app's own permissions in that case.
         const available = await SpeechRecognition.available().catch(() => ({ available: false }));
         if (!available.available) {
           params.onError?.(
-            'Speech recognition is not available on this device. Please test on a real iOS or Android device.'
+            'Speech recognition isn\'t available right now. On a real device, check Settings → General → ' +
+              'Keyboard → Enable Dictation is turned on (and that Screen Time restrictions aren\'t blocking it). ' +
+              'This only happens in the iOS Simulator otherwise.'
           );
           return {
             getTranscript: () => '',
