@@ -660,6 +660,14 @@ const ChatPage: React.FC = () => {
     currentChatIdRef.current = currentChatId;
   }, [currentChatId]);
 
+  // Set the instant a brand-new thread is created out of the conversation
+  // already visible on screen (first message of a new chat). Lets the
+  // messages-reset effect below distinguish that case — where nothing
+  // should be wiped, since it's the same messages, just now backed by a
+  // real thread id — from genuinely switching to a different, existing
+  // conversation, where a reset-then-reload is correct.
+  const justCreatedChatIdRef = useRef<string | null>(null);
+
   // Guards the one-time "resolve which thread to open" effect (below) from
   // clobbering an explicit user action — selecting a conversation from
   // history, or starting a new chat — that happens while that effect's
@@ -762,6 +770,7 @@ const ChatPage: React.FC = () => {
 
     try {
       const newId = await createEmptyChat(uid);
+      justCreatedChatIdRef.current = newId;
       setCurrentChatId(newId);
       try {
         sessionStorage.setItem(activeChatIdStorageKey(uid), newId);
@@ -877,7 +886,15 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     if (!user?.uid || !currentChatId) return;
     if (prevSubChatIdRef.current !== currentChatId) {
-      setMessages([]);
+      if (justCreatedChatIdRef.current === currentChatId) {
+        // This thread was just created from the messages already on
+        // screen (first send in a new chat) — nothing stale to clear.
+        justCreatedChatIdRef.current = null;
+      } else {
+        // Switching to a different, already-existing conversation —
+        // clear the old thread's messages while the new ones load.
+        setMessages([]);
+      }
       prevSubChatIdRef.current = currentChatId;
     }
     const uid = user.uid;
