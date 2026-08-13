@@ -20,7 +20,7 @@ import { hasSeenWelcome } from '../utils/welcomeStorage';
 import { LANGUAGES, type Language } from './LanguageModal';
 import { getResolvedDialectLangCode } from '../utils/dialectPreference';
 import CardDetailModal from './CardDetailModal';
-import WordOfDayModal from './WordOfDayModal';
+import WordOfDayModal, { prefetchWordOfDay } from './WordOfDayModal';
 import { phDateKey } from '../utils/learnStreak';
 import {
   QUIZ_PROGRESS_UPDATED_EVENT,
@@ -570,6 +570,12 @@ const HomePage: React.FC = () => {
     () => LANGUAGES.find((l: Language) => l.code === activeLanguageCode),
     [activeLanguageCode]
   );
+
+  /** Warm the Word of the Day cache as soon as the active dialect is known,
+   *  so the modal opens instantly instead of waiting to compute/load. */
+  useEffect(() => {
+    prefetchWordOfDay(activeLanguageCode, activeDialectMeta?.name ?? fluencyLanguageName);
+  }, [activeLanguageCode, activeDialectMeta, fluencyLanguageName]);
 
   /** Check whether today's Word of the Day has already been completed for this dialect. */
   useEffect(() => {

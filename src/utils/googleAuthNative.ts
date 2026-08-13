@@ -45,12 +45,17 @@ export async function signInWithGoogleNative(): Promise<User> {
       'Set VITE_GOOGLE_WEB_CLIENT_ID in .env to your OAuth 2.0 Web client ID (Google Cloud Console → APIs & Services → Credentials, or Firebase Console → Project settings → General → your Web app).',
     );
   }
+  if (!iosClientId?.trim()) {
+    throw new Error(
+      'Set VITE_GOOGLE_IOS_CLIENT_ID in .env to your iOS OAuth client ID (the CLIENT_ID field in GoogleService-Info.plist, or Google Cloud Console → APIs & Services → Credentials → your iOS client). Without it, native Google Sign-In fails with a cryptic "provider not initialized" error on iOS.',
+    );
+  }
 
-if (!socialLoginReady) {
+  if (!socialLoginReady) {
     await SocialLogin.initialize({
       google: {
         webClientId: webClientId.trim(),
-        iOSClientId: iosClientId?.trim(),
+        iOSClientId: iosClientId.trim(),
         mode: 'online',
       },
     });

@@ -179,6 +179,36 @@ export async function createEmptyChat(uid: string): Promise<string> {
   return chatId;
 }
 
+export async function deleteChatMessage(uid: string, chatId: string, messageId: string): Promise<void> {
+  await deleteDoc(doc(firebaseDb, 'users', uid, 'chats', chatId, 'messages', messageId));
+}
+
+export interface TranslationReportPayload {
+  chatId: string;
+  messageId: string;
+  content: string;
+  dialect?: string;
+}
+
+/** Logs a user-flagged bad translation for later review — writes to a
+ *  top-level collection (not per-user) so it can be reviewed in one place
+ *  without needing per-user Firestore access. */
+export async function reportTranslationIssue(
+  uid: string | null,
+  payload: TranslationReportPayload
+): Promise<void> {
+  const reportRef = doc(collection(firebaseDb, 'translationReports'));
+  await setDoc(reportRef, {
+    reporterId: uid ?? 'guest',
+    chatId: payload.chatId,
+    messageId: payload.messageId,
+    content: shortenContent(payload.content, 2000),
+    dialect: payload.dialect ?? null,
+    createdAt: serverTimestamp(),
+    reportedAt: Date.now(),
+  });
+}
+
 export async function upsertChatMessage(uid: string, chatId: string, msg: PersistableChatMessage): Promise<void> {
   const base = sanitizeForFirestore(msg);
   base.chatId = chatId;

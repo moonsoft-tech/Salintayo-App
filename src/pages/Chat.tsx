@@ -39,10 +39,12 @@ import {
   createEmptyChat,
   chatThreadExists,
   deleteAllChatThreads,
+  deleteChatMessage,
   deleteChatThread,
   fetchChatMessages,
   mergeChatMessages,
   migrateLocalSessionsToFirestoreIfEmpty,
+  reportTranslationIssue,
   subscribeChatMessages,
   subscribeUserChatThreads,
   updateChatThreadMeta,
@@ -674,6 +676,8 @@ const ChatPage: React.FC = () => {
   const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
   const [speakingTtsMessageId, setSpeakingTtsMessageId] = useState<string | null>(null);
+  const [openMessageMenuId, setOpenMessageMenuId] = useState<string | null>(null);
+  const [reportedMessageIds, setReportedMessageIds] = useState<Set<string>>(new Set());
 
   // ----- Keyboard-aware bottom nav -----
   // When the on-screen keyboard opens, the webview's visual/layout viewport
@@ -1287,6 +1291,90 @@ Always respond primarily in ${lang.label} when the user communicates in English.
     });
   }, [speakingTtsMessageId]);
 
+  const handleCopyMessage = useCallback(async (msg: ChatMessage) => {
+    setOpenMessageMenuId(null);
+    try {
+      await navigator.clipboard.writeText(msg.content);
+    } catch (e) {
+      console.warn('Copy failed:', e);
+    }
+  }, []);
+
+  const handleDeleteMessage = useCallback(
+    (msg: ChatMessage) => {
+      setOpenMessageMenuId(null);
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+      if (user?.uid && currentChatIdRef.current) {
+        void deleteChatMessage(user.uid, currentChatIdRef.current, msg.id).catch((e) =>
+          console.error('Delete message failed:', e)
+        );
+      }
+    },
+    [user?.uid]
+  );
+
+  const handleReportMessage = useCallback(
+    (msg: ChatMessage) => {
+      setOpenMessageMenuId(null);
+      const chatId = currentChatIdRef.current ?? 'guest';
+      void reportTranslationIssue(user?.uid ?? null, {
+        chatId,
+        messageId: msg.id,
+        content: msg.content,
+        dialect: getActiveDialect().code,
+      })
+        .then(() => setReportedMessageIds((prev) => new Set(prev).add(msg.id)))
+        .catch((e) => console.error('Report failed:', e));
+    },
+    [user?.uid]
+  );
+
+  /** Core reply-generation logic, shared by normal sends and "Regenerate response". */
+  const generateAiReply = async (
+    text: string,
+    historyForModel: ChatMessage[],
+    options?: { forceTranslation?: boolean }
+  ): Promise<string> => {
+    const translationMode =
+      Boolean(options?.forceTranslation) ||
+      isTranslationRequest(text) ||
+      isAutoTranslationCandidate(text) ||
+      isLongPlainTranslationPaste(text);
+    const wordCount = getWordCount(text);
+    const forceSingleWord =
+      /\b(one word|single word)\b/i.test(text) ||
+      (/\bword\b/i.test(text) && !/\bsentence\b/i.test(text)) ||
+      wordCount === 1;
+
+    const activeDialect = getActiveDialect();
+    const systemPrompt = translationMode
+      ? getStrictTranslationSystemPrompt(activeDialect)
+      : getLanguageSystemPrompt(quickChatLanguage);
+
+    const messagesForModel = translationMode
+      ? ([{ role: 'user' as const, content: text }] as { role: 'user' | 'assistant'; content: string }[])
+      : (historyForModel.slice(-10).map((msg) => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content,
+        })) as { role: 'user' | 'assistant'; content: string }[]).concat([
+          { role: 'user', content: text },
+        ]);
+
+    const reply = await askOpenRouter(messagesForModel, systemPrompt, {
+      maxTokens: translationMode ? translationMaxOutputTokens(text, forceSingleWord) : 1000,
+      temperature: translationMode ? 0.1 : 0.7,
+      reasoningEnabled: !translationMode,
+    });
+
+    return translationMode
+      ? formatTranslationReply({
+          originalText: text,
+          target: activeDialect,
+          translation: extractTranslationOnly(reply, forceSingleWord),
+        })
+      : reply;
+  };
+
   const sendTextToAI = async (
     textRaw: string,
     options?: { skipUserMessage?: boolean; forceTranslation?: boolean }
@@ -1308,46 +1396,7 @@ Always respond primarily in ${lang.label} when the user communicates in English.
 
     setIsLoading(true);
     try {
-      const translationMode =
-        Boolean(options?.forceTranslation) ||
-        isTranslationRequest(text) ||
-        isAutoTranslationCandidate(text) ||
-        isLongPlainTranslationPaste(text);
-      const wordCount = getWordCount(text);
-      const forceSingleWord =
-        /\b(one word|single word)\b/i.test(text) ||
-        (/\bword\b/i.test(text) && !/\bsentence\b/i.test(text)) ||
-        wordCount === 1;
-
-      const activeDialect = getActiveDialect();
-      const systemPrompt = translationMode
-        ? getStrictTranslationSystemPrompt(activeDialect)
-        : getLanguageSystemPrompt(quickChatLanguage);
-
-      // Translation mode doesn't need full conversation context.
-      // Sending only the current input makes the model faster and more deterministic.
-      const messagesForModel = translationMode
-        ? ([{ role: 'user' as const, content: text }] as { role: 'user' | 'assistant'; content: string }[])
-        : (messages.slice(-10).map((msg) => ({
-            role: msg.role as 'user' | 'assistant',
-            content: msg.content,
-          })) as { role: 'user' | 'assistant'; content: string }[]).concat([
-            { role: 'user', content: text },
-          ]);
-
-      const reply = await askOpenRouter(messagesForModel, systemPrompt, {
-        maxTokens: translationMode ? translationMaxOutputTokens(text, forceSingleWord) : 1000,
-        temperature: translationMode ? 0.1 : 0.7,
-        reasoningEnabled: !translationMode,
-      });
-
-      const content = translationMode
-        ? formatTranslationReply({
-            originalText: text,
-            target: activeDialect,
-            translation: extractTranslationOnly(reply, forceSingleWord),
-          })
-        : reply;
+      const content = await generateAiReply(text, messages, { forceTranslation: options?.forceTranslation });
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -1371,6 +1420,38 @@ Always respond primarily in ${lang.label} when the user communicates in English.
       setIsLoading(false);
     }
   };
+
+  const handleRegenerateMessage = useCallback(
+    async (msg: ChatMessage) => {
+      setOpenMessageMenuId(null);
+      if (msg.role !== 'ai' || isLoading) return;
+
+      const idx = messages.findIndex((m) => m.id === msg.id);
+      if (idx === -1) return;
+      const priorMessages = messages.slice(0, idx);
+      const lastUserIdx = priorMessages.map((m) => m.role).lastIndexOf('user');
+      if (lastUserIdx === -1) return;
+      const lastUser = priorMessages[lastUserIdx];
+      const historyBeforeThatUser = priorMessages.slice(0, lastUserIdx);
+
+      setIsLoading(true);
+      try {
+        const newContent = await generateAiReply(lastUser.content, historyBeforeThatUser);
+        const updated: ChatMessage = {
+          ...msg,
+          content: newContent || 'Sorry, I could not generate a response. Please try again.',
+          timestamp: formatTime(),
+        };
+        setMessages((prev) => prev.map((m) => (m.id === msg.id ? updated : m)));
+        if (user?.uid) persistCloudMessage(updated);
+      } catch (e) {
+        console.error('Regenerate failed:', e);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [messages, isLoading, user?.uid, persistCloudMessage]
+  );
 
   const handleSend = async () => {
     const text = inputValue.trim();
@@ -2104,13 +2185,60 @@ Rules:
                         >
                           <IonIcon icon={volumeMediumOutline} aria-hidden />
                         </button>
-                        <button
-                          type="button"
-                          className="chat-message__settings"
-                          aria-label="Message options"
-                        >
-                          <IonIcon icon={settingsOutline} aria-hidden />
-                        </button>
+                        <div className="chat-message__menu-wrap">
+                          <button
+                            type="button"
+                            className="chat-message__settings"
+                            aria-label="Message options"
+                            onClick={() => setOpenMessageMenuId((id) => (id === msg.id ? null : msg.id))}
+                          >
+                            <IonIcon icon={settingsOutline} aria-hidden />
+                          </button>
+                          {openMessageMenuId === msg.id && (
+                            <>
+                              <div
+                                className="chat-message__menu-overlay"
+                                onClick={() => setOpenMessageMenuId(null)}
+                                aria-hidden
+                              />
+                              <div className="chat-message__menu" role="menu">
+                                <button
+                                  type="button"
+                                  className="chat-message__menu-item"
+                                  role="menuitem"
+                                  onClick={() => handleCopyMessage(msg)}
+                                >
+                                  Copy text
+                                </button>
+                                <button
+                                  type="button"
+                                  className="chat-message__menu-item"
+                                  role="menuitem"
+                                  onClick={() => handleRegenerateMessage(msg)}
+                                >
+                                  Regenerate response
+                                </button>
+                                <button
+                                  type="button"
+                                  className="chat-message__menu-item"
+                                  role="menuitem"
+                                  disabled={reportedMessageIds.has(msg.id)}
+                                  onClick={() => handleReportMessage(msg)}
+                                >
+                                  {reportedMessageIds.has(msg.id) ? 'Reported ✓' : 'Report incorrect translation'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="chat-message__menu-item chat-message__menu-item--danger"
+                                  role="menuitem"
+                                  onClick={() => handleDeleteMessage(msg)}
+                                >
+                                  Delete message
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     )}
                     {renderMessageContent(msg)}

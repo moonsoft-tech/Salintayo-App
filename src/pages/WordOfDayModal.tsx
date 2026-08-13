@@ -283,6 +283,17 @@ export async function getOrGenerateWordOfDay(dialectId: string, dialectName: str
   return picked;
 }
 
+/** Call this as early as possible (e.g. when the dialect/user is known on
+ *  the parent page) so today's word set is already cached in localStorage
+ *  by the time the user actually opens the modal — makes the modal feel
+ *  instant instead of waiting to load. Safe to call multiple times; it's a
+ *  no-op once cached. */
+export function prefetchWordOfDay(dialectId: string, dialectName: string): void {
+  void getOrGenerateWordOfDay(dialectId, dialectName).catch(() => {
+    // Silently ignore — the modal itself will retry and surface any real error when opened.
+  });
+}
+
 /** Normalizes text for comparison: lowercase, strip punctuation/diacritics/extra spaces. */
 function normalizeForCompare(text: string): string {
   return text
