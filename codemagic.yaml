@@ -5,7 +5,7 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       vars:
-        XCODE_PROJECT: "App.xcodeproj"
+        XCODE_WORKSPACE: "App.xcworkspace"
         XCODE_SCHEME: "App"
       groups:
         - salintayo_secrets
@@ -104,7 +104,7 @@ workflows:
         script: |
           cd $CM_BUILD_DIR/ios/App
           xcodebuild build \
-            -project "$XCODE_PROJECT" \
+            -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \

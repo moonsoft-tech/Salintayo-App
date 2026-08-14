@@ -75,17 +75,74 @@ function omitUndefinedFields<T extends Record<string, unknown>>(obj: T): Partial
 // removes this size ceiling entirely and lets images survive reload.
 const MAX_INLINE_IMAGE_DATA_URL_LENGTH = 700_000;
 
-function sanitizeImageUrlForFirestore(imageUrl: string | undefined): string | undefined {
+/** Longest side (px) for the copy persisted to Firestore. The live/OCR path always uses the original, unresized image — this only affects what's saved for reload / other devices. */
+const PERSISTED_IMAGE_MAX_DIMENSION = 1280;
+const PERSISTED_IMAGE_JPEG_QUALITY = 0.75;
+/** Second, more aggressive pass — tried only if the first compressed copy still doesn't fit. */
+const PERSISTED_IMAGE_MAX_DIMENSION_FALLBACK = 800;
+const PERSISTED_IMAGE_JPEG_QUALITY_FALLBACK = 0.55;
+
+function loadImageForCompression(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not decode image for compression'));
+    img.src = dataUrl;
+  });
+}
+
+async function compressImageDataUrl(dataUrl: string, maxDimension: number, quality: number): Promise<string> {
+  const img = await loadImageForCompression(dataUrl);
+  const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+  const width = Math.max(1, Math.round(img.width * scale));
+  const height = Math.max(1, Math.round(img.height * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas context unavailable for image compression');
+  ctx.drawImage(img, 0, 0, width, height);
+
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+/**
+ * Produces a smaller copy of an inline base64 image specifically for Firestore
+ * persistence. The original, full-quality image is what's shown live in the
+ * current session and what OCR reads — this only affects the copy saved for
+ * reload / other devices. Tries a normal-quality resize first, then a more
+ * aggressive pass if still too large, and only omits the image entirely
+ * (session-only, matching prior behavior) as a last resort.
+ */
+async function sanitizeImageUrlForFirestore(imageUrl: string | undefined): Promise<string | undefined> {
   if (!imageUrl) return undefined;
   // Blob URLs (from URL.createObjectURL) are only valid for the tab/session
   // that created them — persisting them to Firestore would produce a dead
   // link on reload or on another device, so treat them the same as "not set".
   if (imageUrl.startsWith('blob:')) return undefined;
-  if (imageUrl.length > MAX_INLINE_IMAGE_DATA_URL_LENGTH) return undefined;
-  return imageUrl;
+  if (imageUrl.length <= MAX_INLINE_IMAGE_DATA_URL_LENGTH) return imageUrl;
+
+  try {
+    const compressed = await compressImageDataUrl(imageUrl, PERSISTED_IMAGE_MAX_DIMENSION, PERSISTED_IMAGE_JPEG_QUALITY);
+    if (compressed.length <= MAX_INLINE_IMAGE_DATA_URL_LENGTH) return compressed;
+
+    const compressedMore = await compressImageDataUrl(
+      imageUrl,
+      PERSISTED_IMAGE_MAX_DIMENSION_FALLBACK,
+      PERSISTED_IMAGE_JPEG_QUALITY_FALLBACK
+    );
+    if (compressedMore.length <= MAX_INLINE_IMAGE_DATA_URL_LENGTH) return compressedMore;
+
+    // Still too large even after aggressive compression — omit rather than persist a broken value.
+    return undefined;
+  } catch {
+    // Compression failed (e.g. undecodable image) — omit rather than risk persisting something broken.
+    return undefined;
+  }
 }
 
-function sanitizeForFirestore(msg: PersistableChatMessage): Omit<FirestoreChatMessagePayload, 'createdAt'> {
+async function sanitizeForFirestore(msg: PersistableChatMessage): Promise<Omit<FirestoreChatMessagePayload, 'createdAt'>> {
   let content = msg.content ?? '';
   if (content.startsWith('data:image') || content.length > 50000) {
     content = msg.type === 'image' ? shortenContent(content, 2000) : '[image or large payload omitted for storage]';
@@ -95,7 +152,7 @@ function sanitizeForFirestore(msg: PersistableChatMessage): Omit<FirestoreChatMe
   // that created them — persisting them to Firestore would produce a dead
   // link on reload or on another device, so treat them the same as "not set".
   const audioUrl = msg.audioUrl && !msg.audioUrl.startsWith('blob:') ? msg.audioUrl : undefined;
-  const imageUrl = sanitizeImageUrlForFirestore(msg.imageUrl);
+  const imageUrl = await sanitizeImageUrlForFirestore(msg.imageUrl);
 
   const payload: Omit<FirestoreChatMessagePayload, 'createdAt'> = {
     chatId: '',
@@ -210,7 +267,7 @@ export async function reportTranslationIssue(
 }
 
 export async function upsertChatMessage(uid: string, chatId: string, msg: PersistableChatMessage): Promise<void> {
-  const base = sanitizeForFirestore(msg);
+  const base = await sanitizeForFirestore(msg);
   base.chatId = chatId;
   base.senderId = msg.role === 'user' ? uid : 'ai';
 
@@ -385,7 +442,7 @@ export async function migrateLocalSessionsToFirestoreIfEmpty(
     let batch = writeBatch(firebaseDb);
     let n = 0;
     for (const m of session.messages ?? []) {
-      const base = sanitizeForFirestore(m);
+      const base = await sanitizeForFirestore(m);
       base.chatId = session.id;
       base.senderId = m.role === 'user' ? uid : 'ai';
       const mRef = doc(firebaseDb, 'users', uid, 'chats', session.id, 'messages', m.id);
