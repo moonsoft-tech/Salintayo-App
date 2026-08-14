@@ -40,7 +40,7 @@ workflows:
       - name: Add and sync Capacitor iOS project
         script: |
           if [ ! -d ios ]; then
-            npx cap add ios --packagemanager npm
+            npx cap add ios --packagemanager Cocoapods
           fi
           npx cap sync ios
           
