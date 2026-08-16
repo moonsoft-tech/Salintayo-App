@@ -149,6 +149,7 @@ const ProfilePage: React.FC = () => {
       return v === 'tourist' || v === 'local' ? v : null;
     } catch { return null; }
   });
+  const [residence, setResidence] = useState('');
 
   // Stats
   const [streak, setStreak] = useState(0);
@@ -192,6 +193,8 @@ const ProfilePage: React.FC = () => {
         if (data.phone) setPhone(data.phone);
         if (data.bio) setBio(data.bio);
         if (data.photoBase64) setPhotoSrc(data.photoBase64);
+        if (data.experienceType === 'tourist' || data.experienceType === 'local') setExperience(data.experienceType);
+        if (typeof data.residence === 'string') setResidence(data.residence);
         if (data.languageCode) {
           const saved = LANGUAGES.find(l => l.code === data.languageCode);
           if (saved) {
@@ -252,12 +255,16 @@ const ProfilePage: React.FC = () => {
     phone: string;
     bio: string;
     photoBase64?: string;
+    experienceType?: 'local' | 'tourist' | null;
+    residence?: string;
   }) => {
     setDisplayName(data.displayName);
     setEmail(data.email);
     setPhone(data.phone);
     setBio(data.bio);
     if (data.photoBase64) setPhotoSrc(data.photoBase64);
+    if (data.experienceType !== undefined) setExperience(data.experienceType);
+    if (data.residence !== undefined) setResidence(data.residence);
   }, []);
 
   return (
@@ -341,6 +348,8 @@ const ProfilePage: React.FC = () => {
                 }}>
                   {experience === 'tourist' ? '🧳' : '🏠'}
                   {experience === 'tourist' ? 'Tourist' : 'Local'}
+                  {residence && experience === 'tourist' && ` · ${residence}`}
+                  {residence && experience === 'local' && ` · ${LANGUAGES.find(l => l.code === residence)?.name ?? residence}`}
                 </span>
               </p>
             )}

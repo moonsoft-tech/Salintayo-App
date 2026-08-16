@@ -1265,3 +1265,16 @@
   flex-shrink: 0;
 }
 .chat-history-drawer__profile-more:hover { background: #f3f4f6; color: #374151; }
+.chat-message__sync-retry {
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: #c8261b;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+.chat-message__sync-retry:hover {
+  text-decoration: underline;
+}

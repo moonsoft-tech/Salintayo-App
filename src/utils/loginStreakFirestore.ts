@@ -115,9 +115,25 @@ export function computeNextStreakCount(params: {
 /**
  * Reads current profile, applies streak rules, writes atomically. Safe under concurrent tabs (retries).
  */
-export async function syncLoginStreakOnAuth(uid: string): Promise<LoginStreakSyncResult> {
+export async function syncLoginStreakOnAuth(uid: string, isAnonymous?: boolean): Promise<LoginStreakSyncResult> {
   const todayKey = phDateKey();
   const localDates = readLocalLoginDates();
+
+  // If the user is anonymous, avoid writing a persistent `users/{uid}`
+  // document. Compute the streak locally and return it so the UI can
+  // still reflect the day's activity without creating a DB entry for
+  // ephemeral guest accounts.
+  if (isAnonymous) {
+    const merged = mergeActivityDateStrings(localDates, [todayKey]);
+    const streak = computeCurrentLoginStreakFromDates(new Set(merged));
+    const shouldShowCelebration = !localDates.includes(todayKey);
+    return {
+      streakCount: Math.max(1, Math.floor(streak) || 1),
+      lastLoginDate: todayKey,
+      loginActivityDates: merged,
+      shouldShowCelebration,
+    };
+  }
 
   return runTransaction(firebaseDb, async transaction => {
     const ref = doc(firebaseDb, 'users', uid);
@@ -145,6 +161,7 @@ export async function syncLoginStreakOnAuth(uid: string): Promise<LoginStreakSyn
         lastLoginDate: todayKey,
         loginActivityDates,
         lastActive: serverTimestamp(),
+        ...(typeof isAnonymous === 'boolean' ? { isAnonymous } : {}),
       },
       { merge: true }
     );

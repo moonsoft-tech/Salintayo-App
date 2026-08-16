@@ -5,6 +5,8 @@ import { cancelSpeech, speakText } from '../utils/tts';
 import { startSpeechToText, type SpeechToTextSession } from '../utils/speechToText';
 import { chatWithDeepSeek as askOpenRouter } from '../utils/api';
 import { getResolvedDialectLangCode } from '../utils/dialectPreference';
+import { firebaseAuth, firebaseDb } from '../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import './QuickChatBubble.css';
 
 const STORAGE_KEY = 'salintayo_quickchat_enabled';
@@ -637,6 +639,32 @@ const EmergencyPhrasesModal: React.FC<EmergencyPhrasesModalProps> = ({ isOpen, o
   const listeningForReplyRef = useRef<string | null>(null);
   const isProcessingRef = useRef(false);
 
+  // The local user's actual home/native dialect ("Local · Filipino" on their
+  // Profile), read from Firestore users/{uid}.residence. This is
+  // intentionally separate from the user's Active Dialect (what they're
+  // currently learning/practicing) — a reply should always be translated
+  // into the language the local user actually understands, not whatever
+  // dialect they happen to be practicing at the moment.
+  const [residenceDialectCode, setResidenceDialectCode] = useState<string | null>(null);
+  useEffect(() => {
+    const uid = firebaseAuth.currentUser?.uid;
+    if (!uid) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const snap = await getDoc(doc(firebaseDb, 'users', uid));
+        if (cancelled || !snap.exists()) return;
+        const residence = snap.data()?.residence;
+        if (typeof residence === 'string' && residence.trim()) {
+          setResidenceDialectCode(residence.trim().toLowerCase());
+        }
+      } catch (e) {
+        console.warn('Failed to load residence dialect:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const [langCode, setLangCode] = useState<string>(getLangCode);
   useEffect(() => {
     const onLangChanged = () => setLangCode(getLangCode());
@@ -778,10 +806,21 @@ const EmergencyPhrasesModal: React.FC<EmergencyPhrasesModalProps> = ({ isOpen, o
 
     setLiveReplyTranscript(`Translating...`);
 
-    try {
-      // Determine target language based on user experience (Tourist = English, Local = Filipino)
+try {
+      // Determine target language based on user experience.
+      // Tourist: the LOCAL person's spoken reply is translated INTO English,
+      // so the tourist can read/hear it — this is the text shown in the
+      // bottom "🗣️ They said:" box, never the top original phrase.
+      // Local: the TOURIST's spoken reply is translated into the local
+      // user's actual home dialect (Profile's "Local · X" / residence
+      // field) — not their Active Dialect, since that may just be
+      // whatever they're currently practicing, which they may not
+      // actually understand yet.
       const experience = localStorage.getItem('salintayo_experience');
-      const targetLanguageName = experience === 'local' ? 'Filipino' : 'English';
+      const targetLanguageName =
+        experience === 'local'
+          ? (residenceDialectCode ? LANG_LABEL_MAP[residenceDialectCode] ?? 'Filipino' : 'Filipino')
+          : 'English';
 
       const translation = await askOpenRouter([
         {

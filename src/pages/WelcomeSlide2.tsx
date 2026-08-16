@@ -9,6 +9,7 @@ import {
   QCB_DIALECT_LANG_STORAGE_KEY,
   EXPERIENCE_STORAGE_KEY,
 } from '../utils/dialectPreference';
+import EditProfileModal from './EditProfileModal';
 import './WelcomeSlide2.css';
 
 const imgLogo = '/logo.png';
@@ -22,6 +23,7 @@ export default function WelcomeSlide2() {
   const history = useHistory();
   const { user } = useAuth();
   const [selected, setSelected] = useState<Experience>(null);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const welcomeContentRef = useIonContentScrollTopOnEnter();
 
   useEffect(() => {
@@ -30,6 +32,11 @@ export default function WelcomeSlide2() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only redirect when user changes
   }, [user?.uid]);
+
+  const proceedToCulturalIntro = () => {
+    markOnboardingStepComplete(user?.uid, 'welcome2');
+    history.push('/cultural-intro');
+  };
 
   const handleContinue = () => {
     if (!selected) return;
@@ -41,8 +48,7 @@ export default function WelcomeSlide2() {
       window.dispatchEvent(new Event('salintayo_lang_changed'));
       window.dispatchEvent(new Event('salintayo_qcb_lang_changed'));
     } catch {}
-    markOnboardingStepComplete(user?.uid, 'welcome2');
-    history.push('/cultural-intro');
+    setShowEditProfileModal(true);
   };
 
   return (
@@ -115,6 +121,17 @@ export default function WelcomeSlide2() {
             </button>
           </div>
         </div>
+
+        <EditProfileModal
+          isOpen={showEditProfileModal}
+          onClose={() => {
+            setShowEditProfileModal(false);
+            proceedToCulturalIntro();
+          }}
+          onSave={() => {
+            // The modal saves the user data itself; continue after it closes.
+          }}
+        />
       </IonContent>
     </IonPage>
   );

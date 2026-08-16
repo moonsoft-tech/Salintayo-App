@@ -29,17 +29,7 @@ const CULTURAL_MAP: Record<string, CulturalData> = {
       { value: '1937', label: 'Standardized' },
     ],
   },
-  en: {
-    imageUrl: 'Images/Enlish.jpg',
-    imageAlt: 'Manila skyline',
-    description:
-      'English is an official language of the Philippines — the language of law, higher education, and business, woven together with Filipino in everyday life across the islands.',
-    highlights: ['Co-official with Filipino in the Philippines', 'Bridge for global connection & media', 'Filipino English has its own vibrant expressions'],
-    facts: [
-      { value: 'PH / Global', label: 'Reach' },
-      { value: 'Official', label: 'Status' },
-    ],
-  },
+  
   ceb: {
     imageUrl: 'Images/Cebu.jpg',
     imageAlt: 'Lapu-Lapu Monument, Cebu',
@@ -63,7 +53,7 @@ const CULTURAL_MAP: Record<string, CulturalData> = {
     ],
   },
   ilo: {
-    imageUrl: '/assets/images/Ilocos.jpg',
+    imageUrl: 'Images/Ilocos.jpg',
     imageAlt: 'Bantay Bell Tower, Ilocos Sur',
     description:
       'Ilocano thrives among the rugged mountains of Northern Luzon. Known for grit and resourcefulness, its speakers carry the language to every corner of the world.',
@@ -105,6 +95,13 @@ const GLOBE = (
     <circle cx="12" cy="12" r="10" />
     <line x1="2" y1="12" x2="22" y2="12" />
     <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+  </svg>
+);
+
+// NEW: down-pointing chevron used as the "look here" hint under the empty state
+const DOWN_ARROW = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
@@ -280,6 +277,10 @@ export default function CulturalIntroSlide({ initialLanguageCode, onContinue }: 
                   <div className="ci-empty-icon">{GLOBE}</div>
                   <p className="ci-empty-title">Pick a dialect below</p>
                   <p className="ci-empty-sub">We'll show you cultural highlights and what makes each language special.</p>
+                  {/* NEW: bouncing chevron pointing toward the dialect grid */}
+                  <span className="ci-empty-arrow ci-cta-arrow-bounce" aria-hidden="true">
+                    {DOWN_ARROW}
+                  </span>
                 </div>
               )}
 
@@ -342,9 +343,17 @@ export default function CulturalIntroSlide({ initialLanguageCode, onContinue }: 
 
             {/* ═══ DIALECT CHOOSER ═══ */}
             <section className="ci-lang-section">
-              <div className="ci-section-label">Choose your dialect</div>
+              <div
+  className={[
+    'ci-section-label',
+    'ci-section-label--lang',
+    !selectedCode ? 'ci-section-label--flicker' : '',
+  ].join(' ')}
+>
+  Choose your dialect
+</div>
               <div className="ci-lang-grid" role="listbox" aria-label="Available dialects">
-                {LANGUAGES.map(lang => {
+                {LANGUAGES.filter(lang => lang.code !== 'en').map(lang => {
                   const isActive = selectedCode === lang.code;
                   const isTapped = tappedCode === lang.code;
                   return (
@@ -354,6 +363,8 @@ export default function CulturalIntroSlide({ initialLanguageCode, onContinue }: 
                       aria-selected={isActive}
                       className={[
                         'ci-lang-btn',
+                        // NEW: pulse/brighten every option until the user has picked one
+                        !selectedCode ? 'ci-lang-btn--attract' : '',
                         isActive ? 'ci-lang-btn--active' : '',
                         isTapped ? 'ci-lang-btn--tapped' : '',
                       ].join(' ')}

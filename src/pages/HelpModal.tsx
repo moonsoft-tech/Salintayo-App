@@ -36,22 +36,27 @@ const USER_GUIDE_SECTIONS: { title: string; body: string }[] = [
   {
     title: 'Home & navigation',
     body:
-      'Use the bottom tabs to move between Learn, Quiz, Home, Chat, and Profile. Home highlights dialect content and quick entry points.',
+      'Use the bottom tabs to move between Home, Chat, Profile, and other sections. Home highlights dialect content and quick entry points.',
   },
   {
-    title: 'Learn',
+    title: 'Word of the Day',
     body:
-      'Pick a dialect path, follow lessons, and track your streak. Your progress is saved on this device and can sync with your profile where enabled.',
-  },
-  {
-    title: 'Quiz',
-    body:
-      'Practice with quizzes for your selected dialect. Review results to see what to study next.',
+      'Discover a new word each day to expand your vocabulary. Tap the Word of the Day card to see meanings and examples in context.',
   },
   {
     title: 'Chat',
     body:
-      'Chat helps you practice conversations. You can type, use quick replies, and use attachments or voice where the app supports them. Choose your dialect context so replies match your learning goal.',
+      'Practice conversations with the AI by typing messages or using quick replies. Select your dialect context so replies match your learning goal.',
+  },
+  {
+    title: 'Voice (Mic)',
+    body:
+      'Use the microphone to speak. The app can capture your voice for practice, transcription, or sending voice messages when available.',
+  },
+  {
+    title: 'Pictures & Attachments',
+    body:
+      'Attach photos to get translations, OCR help, or image-based conversation support. Large images may be stored only for the current session.',
   },
   {
     title: 'Profile & settings',
@@ -83,7 +88,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
   const [feedbackSuccessMsg, setFeedbackSuccessMsg] = useState<string | null>(null);
 
   const helpItems: HelpItem[] = [
-    { icon: '📖', title: 'User Guide', subtitle: 'Learn how to use SalinTayo' },
+    { icon: '📖', title: 'User Guide', subtitle: 'How to use SalinTayo features' },
     { icon: '🐛', title: 'Report a Bug', subtitle: 'Help us improve the app' },
     { icon: '⭐', title: 'Rate SalinTayo', subtitle: 'Share your feedback' },
   ];

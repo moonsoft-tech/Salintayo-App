@@ -44,12 +44,12 @@ import {
   fetchChatMessages,
   mergeChatMessages,
   migrateLocalSessionsToFirestoreIfEmpty,
-  reportTranslationIssue,
   subscribeChatMessages,
   subscribeUserChatThreads,
   updateChatThreadMeta,
   upsertChatMessage,
 } from '../utils/userChatFirestore';
+import { submitBugReport } from '../utils/helpCenterFirestore';
 import './Chat.css';
 import { speakText, cancelSpeech } from '../utils/tts';
 import { getResolvedDialectLangCode, getDefaultDialectCodeForExperience } from '../utils/dialectPreference';
@@ -686,6 +686,9 @@ const ChatPage: React.FC = () => {
   const [speakingTtsMessageId, setSpeakingTtsMessageId] = useState<string | null>(null);
   const [openMessageMenuId, setOpenMessageMenuId] = useState<string | null>(null);
   const [reportedMessageIds, setReportedMessageIds] = useState<Set<string>>(new Set());
+  // NEW: tracks message ids whose Firestore write failed, so the UI can show a retry affordance
+  // instead of the failure only ever reaching the console.
+  const [failedSyncMessageIds, setFailedSyncMessageIds] = useState<Set<string>>(new Set());
 
   // ----- Keyboard-aware bottom nav -----
   // When the on-screen keyboard opens, the webview's visual/layout viewport
@@ -772,6 +775,7 @@ const ChatPage: React.FC = () => {
       const newId = await createEmptyChat(uid);
       justCreatedChatIdRef.current = newId;
       setCurrentChatId(newId);
+      currentChatIdRef.current = newId; // NEW: keep the ref in sync immediately, not just after the next effect run
       try {
         sessionStorage.setItem(activeChatIdStorageKey(uid), newId);
       } catch {
@@ -784,6 +788,9 @@ const ChatPage: React.FC = () => {
     }
   }, [user?.uid]);
 
+  // NEW: proper per-message save with error tracking instead of a bare
+  // `.catch(console.error)`. Awaits the write so success/failure is known,
+  // and clears/sets the message's id in failedSyncMessageIds accordingly.
   const persistCloudMessage = useCallback(
     async (msg: ChatMessage) => {
       const uid = user?.uid;
@@ -792,11 +799,34 @@ const ChatPage: React.FC = () => {
       if (!cid) {
         cid = await ensureChatThread();
       }
-      if (!cid) return;
+      if (!cid) {
+        setFailedSyncMessageIds((prev) => new Set(prev).add(msg.id));
+        return;
+      }
       const sanitized = stripUndefinedFields(msg) as ChatMessage;
-      void upsertChatMessage(uid, cid, sanitized).catch((err) => console.error('Chat save failed:', err));
+      try {
+        await upsertChatMessage(uid, cid, sanitized);
+        setFailedSyncMessageIds((prev) => {
+          if (!prev.has(msg.id)) return prev;
+          const next = new Set(prev);
+          next.delete(msg.id);
+          return next;
+        });
+      } catch (err) {
+        console.error('Chat save failed:', err);
+        setFailedSyncMessageIds((prev) => new Set(prev).add(msg.id));
+      }
     },
     [ensureChatThread, user?.uid]
+  );
+
+  // NEW: manual retry for a message the user sees flagged as unsynced.
+  const handleRetrySync = useCallback(
+    (msg: ChatMessage) => {
+      if (!user?.uid) return;
+      void persistCloudMessage(msg);
+    },
+    [persistCloudMessage, user?.uid]
   );
 
   // Guest: session list from localStorage. Signed-in: live thread list from Firestore.
@@ -1043,6 +1073,7 @@ const ChatPage: React.FC = () => {
         /* ignore */
       }
       setCurrentChatId(null);
+      currentChatIdRef.current = null; // NEW: sync the ref immediately — ensureChatThread reads this synchronously below
       setMessages([]);
       setPendingImages([]);
       setIsImageTrayOpen(false);
@@ -1051,6 +1082,13 @@ const ChatPage: React.FC = () => {
       setInputValue('');
       setIsHistoryOpen(false);
       setShowClearConfirm(false);
+      setFailedSyncMessageIds(new Set()); // NEW: clear stale retry flags from the previous thread
+      // NEW: create the Firestore thread now, eagerly, instead of waiting
+      // for the first message to trigger it inside persistCloudMessage.
+      // This removes the await-before-first-write race on slow/interrupted
+      // connections — by the time the user sends anything, currentChatId
+      // is already resolved.
+      void ensureChatThread();
       return;
     }
     try {
@@ -1334,11 +1372,13 @@ Always respond primarily in ${lang.label} when the user communicates in English.
     (msg: ChatMessage) => {
       setOpenMessageMenuId(null);
       const chatId = currentChatIdRef.current ?? 'guest';
-      void reportTranslationIssue(user?.uid ?? null, {
-        chatId,
-        messageId: msg.id,
-        content: msg.content,
-        dialect: getActiveDialect().code,
+      void submitBugReport({
+        userId: user?.uid || 'guest',
+        userEmail: user?.email || '',
+        userName: user?.displayName || '',
+        bugType: 'Incorrect Translation',
+        description: `Reported translation: "${msg.content}"\nDialect: ${getActiveDialect().code}\nChat: ${chatId}, Message: ${msg.id}`,
+        platform: Capacitor.getPlatform(),
       })
         .then(() => setReportedMessageIds((prev) => new Set(prev).add(msg.id)))
         .catch((e) => console.error('Report failed:', e));
@@ -2261,6 +2301,16 @@ Rules:
                     {renderMessageContent(msg)}
                   </div>
                   <span className="chat-message__time">{msg.timestamp}</span>
+                  {/* NEW: retry affordance for messages that failed to sync to Firestore */}
+                  {user?.uid && failedSyncMessageIds.has(msg.id) && (
+                    <button
+                      type="button"
+                      className="chat-message__sync-retry"
+                      onClick={() => handleRetrySync(msg)}
+                    >
+                      ⚠️ Sync failed · Retry
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

@@ -10,9 +10,9 @@ const imgLogo = '/logo.png';
 
 /** Static highlights for Slide 1 — not selectable; overview only. */
 const FEATURES = [
-  { icon: '💬', label: 'Chat & practice with AI' },
-  { icon: '📝', label: 'Quizzes & bite-sized lessons' },
-  { icon: '🔥', label: 'Streaks & learning progress' },
+  { icon: '💬', label: 'Chat & translate with AI' },
+  { icon: '🎙️', label: 'Voice-to-voice translation' },
+  { icon: '📷', label: 'Scan & translate photos' },
   { icon: '🌏', label: 'Dialects & cultural context' },
 ];
 
@@ -38,10 +38,12 @@ export default function WelcomeSlide1() {
                 <img src={imgLogo} alt="SalinTayo" />
               </div>
               <h1 className="welcome-slide1__title">SalinTayo</h1>
-              <p className="welcome-slide1__subtitle">Philippine languages, made approachable</p>
+              <p className="welcome-slide1__subtitle">
+                Filipino, Cebuano, Ilocano, Hiligaynon, and Pangasinense — all in one app.
+              </p>
               <p className="welcome-slide1__lede">
-                Explore regional dialects, practice real conversations, and grow your skills at your own pace—whether
-                you&apos;re learning for travel, family, or curiosity.
+                Chat, translate, and have real conversations in the language you need, right when you need it —
+                whether that&apos;s for travel, family, or just curiosity.
               </p>
             </header>
 

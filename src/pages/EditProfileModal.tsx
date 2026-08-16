@@ -15,6 +15,13 @@ import './EditProfileModal.css';
 import { firebaseAuth, firebaseDb } from '../firebase';
 import { updateProfile, updateEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { LANGUAGES } from './LanguageModal';
+import { COUNTRIES } from '../utils/countries';
+import { EXPERIENCE_STORAGE_KEY } from '../utils/dialectPreference';
+
+/** The 5 dialects available in-app — used for the "Local" location picker. */
+const LOCAL_DIALECT_CODES = ['fil', 'ceb', 'ilo', 'hil', 'pag'];
+const LOCAL_DIALECT_OPTIONS = LANGUAGES.filter((l) => LOCAL_DIALECT_CODES.includes(l.code));
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -25,6 +32,8 @@ interface EditProfileModalProps {
     phone: string;
     bio: string;
     photoBase64?: string;
+    experienceType?: 'local' | 'tourist' | null;
+    residence?: string;
   }) => void;
 }
 
@@ -34,6 +43,8 @@ interface FormState {
   phone: string;
   bio: string;
   photoBase64: string | null;
+  experienceType: 'local' | 'tourist' | null;
+  residence: string;
 }
 
 type ToastType = 'success' | 'error';
@@ -72,8 +83,8 @@ const VALIDATORS: Partial<Record<FieldKey, (v: string) => string>> = {
 const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, onSave }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [form, setForm]         = useState<FormState>({ displayName: '', email: '', phone: '', bio: '', photoBase64: null });
-  const [original, setOriginal] = useState<FormState>({ displayName: '', email: '', phone: '', bio: '', photoBase64: null });
+  const [form, setForm]         = useState<FormState>({ displayName: '', email: '', phone: '', bio: '', photoBase64: null, experienceType: null, residence: '' });
+  const [original, setOriginal] = useState<FormState>({ displayName: '', email: '', phone: '', bio: '', photoBase64: null, experienceType: null, residence: '' });
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast]       = useState<{ message: string; type: ToastType } | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -84,6 +95,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
     phone:       { ...EMPTY_META },
     bio:         { ...EMPTY_META },
     photoBase64: { ...EMPTY_META },
+    experienceType: { ...EMPTY_META },
+    residence:   { ...EMPTY_META },
   });
 
   const [showConfirm, setShowConfirm]               = useState(false);
@@ -98,12 +111,20 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
     const load = async () => {
       const user = firebaseAuth.currentUser;
       if (!user) return;
+      let localExperienceFallback: 'local' | 'tourist' | null = null;
+      try {
+        const v = localStorage.getItem(EXPERIENCE_STORAGE_KEY);
+        localExperienceFallback = v === 'tourist' || v === 'local' ? v : null;
+      } catch { /* ignore */ }
+
       const base: FormState = {
         displayName: user.displayName ?? '',
         email:       user.email ?? '',
         phone:       '',
         bio:         '',
         photoBase64: null,
+        experienceType: localExperienceFallback,
+        residence:   '',
       };
       try {
         const snap = await getDoc(doc(firebaseDb, 'users', user.uid));
@@ -113,12 +134,22 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
           if (d.phone)       base.phone       = d.phone;
           if (d.bio)         base.bio         = d.bio;
           if (d.photoBase64) base.photoBase64  = d.photoBase64;
+          if (d.experienceType === 'tourist' || d.experienceType === 'local') base.experienceType = d.experienceType;
+          if (typeof d.residence === 'string') base.residence = d.residence;
         }
       } catch (e) { console.error('Firestore load error:', e); }
       setForm({ ...base });
       setOriginal({ ...base });
       setPhotoPreview(base.photoBase64 ?? user.photoURL ?? null);
-      setMeta({ displayName: { ...EMPTY_META }, email: { ...EMPTY_META }, phone: { ...EMPTY_META }, bio: { ...EMPTY_META }, photoBase64: { ...EMPTY_META } });
+      setMeta({
+        displayName: { ...EMPTY_META },
+        email: { ...EMPTY_META },
+        phone: { ...EMPTY_META },
+        bio: { ...EMPTY_META },
+        photoBase64: { ...EMPTY_META },
+        experienceType: { ...EMPTY_META },
+        residence: { ...EMPTY_META },
+      });
     };
     load();
   }, [isOpen]);
@@ -233,8 +264,13 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
         email:       form.email,
         phone:       form.phone,
         bio:         form.bio,
+        experienceType: form.experienceType,
+        residence:   form.residence,
       };
       if (form.photoBase64 !== original.photoBase64) payload.photoBase64 = form.photoBase64;
+      try {
+        if (form.experienceType) localStorage.setItem(EXPERIENCE_STORAGE_KEY, form.experienceType);
+      } catch { /* ignore */ }
 
       let errorMessage = '';
       try {
@@ -246,7 +282,15 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
 
       if (!errorMessage) {
         showToast('Profile updated!', 'success');
-        onSave({ displayName: form.displayName, email: form.email, phone: form.phone, bio: form.bio, photoBase64: form.photoBase64 ?? undefined });
+        onSave({
+          displayName: form.displayName,
+          email: form.email,
+          phone: form.phone,
+          bio: form.bio,
+          photoBase64: form.photoBase64 ?? undefined,
+          experienceType: form.experienceType,
+          residence: form.residence,
+        });
         setOriginal({ ...form });
         setTimeout(() => onClose(), 1400);
       } else {
@@ -271,10 +315,24 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
   const doClose = () => {
     setForm({ ...original });
     setPhotoPreview(original.photoBase64 ?? firebaseAuth.currentUser?.photoURL ?? null);
-    setMeta({ displayName: { ...EMPTY_META }, email: { ...EMPTY_META }, phone: { ...EMPTY_META }, bio: { ...EMPTY_META }, photoBase64: { ...EMPTY_META } });
+    setMeta({
+      displayName: { ...EMPTY_META },
+      email: { ...EMPTY_META },
+      phone: { ...EMPTY_META },
+      bio: { ...EMPTY_META },
+      photoBase64: { ...EMPTY_META },
+      experienceType: { ...EMPTY_META },
+      residence: { ...EMPTY_META },
+    });
     setShowDiscardConfirm(false);
     setShowConfirm(false);
     onClose();
+  };
+
+  const handleExperienceSelect = (type: 'local' | 'tourist') => {
+    // Switching type clears the old value so a leftover dialect code can't be
+    // mistaken for a country (or vice versa) if the user flips back and forth.
+    setForm((p) => ({ ...p, experienceType: type, residence: p.experienceType === type ? p.residence : '' }));
   };
 
   if (!isOpen) return null;
@@ -285,6 +343,8 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
   if (form.phone !== original.phone)             changedFields.push('Phone number');
   if (form.bio !== original.bio)                 changedFields.push('Bio');
   if (form.photoBase64 !== original.photoBase64) changedFields.push('Profile photo');
+  if (form.experienceType !== original.experienceType) changedFields.push('Local/Tourist');
+  if (form.residence !== original.residence)     changedFields.push('Location');
 
   return createPortal(
     <>
@@ -447,6 +507,79 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
                 />
                 {meta.bio.state === 'error' && (
                   <span className="epm-error-msg" role="alert"><IonIcon icon={alertCircleOutline} className="epm-error-icon" />{meta.bio.message}</span>
+                )}
+              </div>
+
+              {/* Local / Tourist + Location */}
+              <div className="epm-field">
+                <label className="epm-label">I am a</label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => handleExperienceSelect('local')}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: form.experienceType === 'local' ? '1.5px solid #1d4ed8' : '1.5px solid #e2e6f0',
+                      background: form.experienceType === 'local' ? 'rgba(239,246,255,1)' : '#fff',
+                      color: form.experienceType === 'local' ? '#1d4ed8' : '#4b5568',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🏠 Local
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleExperienceSelect('tourist')}
+                    style={{
+                      flex: 1,
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      border: form.experienceType === 'tourist' ? '1.5px solid #b91c1c' : '1.5px solid #e2e6f0',
+                      background: form.experienceType === 'tourist' ? 'rgba(254,242,242,1)' : '#fff',
+                      color: form.experienceType === 'tourist' ? '#b91c1c' : '#4b5568',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🧳 Tourist
+                  </button>
+                </div>
+
+                {form.experienceType === 'local' && (
+                  <div style={{ marginTop: 10 }}>
+                    <label htmlFor="epm-residence-local" className="epm-label">Your local dialect area</label>
+                    <select
+                      id="epm-residence-local"
+                      className="epm-input"
+                      value={form.residence}
+                      onChange={(e) => setForm((p) => ({ ...p, residence: e.target.value }))}
+                    >
+                      <option value="">Select…</option>
+                      {LOCAL_DIALECT_OPTIONS.map((l) => (
+                        <option key={l.code} value={l.code}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {form.experienceType === 'tourist' && (
+                  <div style={{ marginTop: 10 }}>
+                    <label htmlFor="epm-residence-tourist" className="epm-label">Your country</label>
+                    <select
+                      id="epm-residence-tourist"
+                      className="epm-input"
+                      value={form.residence}
+                      onChange={(e) => setForm((p) => ({ ...p, residence: e.target.value }))}
+                    >
+                      <option value="">Select…</option>
+                      {COUNTRIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
             </div>

@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (u) {
           void (async () => {
             try {
-              const r = await syncLoginStreakOnAuth(u.uid);
+              const r = await syncLoginStreakOnAuth(u.uid, u.isAnonymous);
               try {
                 localStorage.setItem(LOGIN_ACTIVITY_DATES_KEY, JSON.stringify(r.loginActivityDates));
               } catch {

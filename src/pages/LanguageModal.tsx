@@ -21,7 +21,6 @@ interface Props {
 
 export const LANGUAGES: Language[] = [
   { code: 'fil', name: 'Filipino', native: 'Filipino', flag: '🇵🇭', gradient: 'linear-gradient(135deg, #dc2626, #fbbf24)', region: 'Philippines', speakers: '90M+' },
-  { code: 'en', name: 'English', native: 'English', flag: '🇬🇧', gradient: 'linear-gradient(135deg, #1e40af, #6366f1)', region: 'International', speakers: '1.5B+' },
   { code: 'ceb', name: 'Cebuano', native: 'Bisaya', flag: '🌴', gradient: 'linear-gradient(135deg, #0d9488, #10b981)', region: 'Visayas / Mindanao', speakers: '20M+' },
   { code: 'hil', name: 'Hiligaynon', native: 'Ilonggo', flag: '🌺', gradient: 'linear-gradient(135deg, #db2777, #f472b6)', region: 'Western Visayas', speakers: '7M+' },
   { code: 'ilo', name: 'Ilocano', native: 'Ilokano', flag: '🏝️', gradient: 'linear-gradient(135deg, #0047ab, #06b6d4)', region: 'Northern Luzon', speakers: '9M+' },
