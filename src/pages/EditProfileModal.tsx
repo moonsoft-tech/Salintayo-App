@@ -1,3 +1,4 @@
+import { timeAsync } from '../utils/perfLog';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { IonIcon } from '@ionic/react';
@@ -127,7 +128,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
         residence:   '',
       };
       try {
-        const snap = await getDoc(doc(firebaseDb, 'users', user.uid));
+        const snap = await timeAsync(
+  'Firestore read (profile)',
+  () => getDoc(doc(firebaseDb, 'users', user.uid))
+);
         if (snap.exists()) {
           const d = snap.data();
           if (d.displayName) base.displayName = d.displayName;
@@ -274,7 +278,10 @@ const EditProfileModal: React.FC<EditProfileModalProps> = ({ isOpen, onClose, on
 
       let errorMessage = '';
       try {
-        await setDoc(doc(firebaseDb, 'users', user.uid), payload, { merge: true });
+        await timeAsync(
+  'Firestore write (profile)',
+  () => setDoc(doc(firebaseDb, 'users', user.uid), payload, { merge: true })
+);
       } catch (fsErr: unknown) {
         const fsCode = (fsErr as { code?: string }).code;
         errorMessage = fsCode === 'permission-denied' ? 'Permission denied. Check Firestore rules.' : 'Could not save to database.';

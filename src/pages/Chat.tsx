@@ -55,6 +55,7 @@ import { speakText, cancelSpeech } from '../utils/tts';
 import { getResolvedDialectLangCode, getDefaultDialectCodeForExperience } from '../utils/dialectPreference';
 import { getOpenRouterHttpReferer } from '../utils/openRouterClient';
 import { callProtectedApi, transcribeWhisper } from '../utils/api';
+import { timeAsync } from '../utils/perfLog';
 
 // Type definitions for Emergency Mode (from EmergencyDialectBubble)
 interface Dialect {
@@ -516,9 +517,14 @@ async function extractTextFromImage(imageBase64: string): Promise<string> {
 
   try {
     const image = await loadImageFromDataUrl(imageBase64);
-    const nativeRaw = await detectTextWithTextDetector(image);
+    const nativeRaw = await timeAsync('OCR (native, Android)', () =>
+  detectTextWithTextDetector(image)
+);
     const processedCanvas = await buildProcessedOcrCanvas(imageBase64);
-    const nativeProcessed = await detectTextWithTextDetector(processedCanvas);
+    const nativeProcessed = await timeAsync(
+  'OCR (native, Android — processed)',
+  () => detectTextWithTextDetector(processedCanvas)
+);
     const nativeBest = nativeProcessed.length > nativeRaw.length ? nativeProcessed : nativeRaw;
     if (nativeBest.trim()) return nativeBest.trim();
   } catch (error) {
@@ -528,10 +534,14 @@ async function extractTextFromImage(imageBase64: string): Promise<string> {
   try {
     const processedCanvas = await buildProcessedOcrCanvas(imageBase64);
     const processedImageBase64 = processedCanvas.toDataURL('image/png');
-    const [visionRaw, visionProcessed] = await Promise.all([
+const [visionRaw, visionProcessed] = await timeAsync(
+  'OCR (AI fallback, iOS)',
+  () =>
+    Promise.all([
       extractTextWithVisionModel(imageBase64),
       extractTextWithVisionModel(processedImageBase64),
-    ]);
+    ])
+);
     const visionBest = visionProcessed.length > visionRaw.length ? visionProcessed : visionRaw;
     if (visionBest.trim()) return visionBest.trim();
   } catch (error) {
@@ -1417,11 +1427,13 @@ Always respond primarily in ${lang.label} when the user communicates in English.
           { role: 'user', content: text },
         ]);
 
-    const reply = await askOpenRouter(messagesForModel, systemPrompt, {
-      maxTokens: translationMode ? translationMaxOutputTokens(text, forceSingleWord) : 1000,
-      temperature: translationMode ? 0.1 : 0.7,
-      reasoningEnabled: !translationMode,
-    });
+const reply = await timeAsync('Chat AI response', () =>
+  askOpenRouter(messagesForModel, systemPrompt, {
+    maxTokens: translationMode ? translationMaxOutputTokens(text, forceSingleWord) : 1000,
+    temperature: translationMode ? 0.1 : 0.7,
+    reasoningEnabled: !translationMode,
+  })
+);
 
     return translationMode
       ? formatTranslationReply({
@@ -2617,4 +2629,4 @@ Rules:
   );
 };
 
-export default ChatPage;
+export default ChatPage;  

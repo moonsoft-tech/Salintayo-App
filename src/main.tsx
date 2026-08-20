@@ -1,3 +1,5 @@
+import { printPerfSummary } from './utils/perfLog';
+(window as any).printPerfSummary = printPerfSummary;
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';

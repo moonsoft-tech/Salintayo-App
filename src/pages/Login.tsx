@@ -19,6 +19,7 @@ import {
   GoogleWebRedirectStarted,
   getGoogleWebErrorMessage,
 } from '../utils/googleAuthWeb';
+import { timeAsync } from '../utils/perfLog';
 import './Login.css';
 
 const imgLogo = '/logo.png';
@@ -112,13 +113,21 @@ export default function LoginPage() {
       await ensureRedirectPersistence();
 
       if (isNativeAppShell()) {
-        const u = await signInWithGoogleNative();
+        // Full tap-to-signed-in time for the native flow: native account
+        // picker + Firebase credential exchange, end to end. (A narrower
+        // sub-metric — just the native picker call itself — is timed
+        // separately inside signInWithGoogleNative().)
+        const u = await timeAsync('Google Sign-In completion (native)', () =>
+          signInWithGoogleNative()
+        );
         navigateAfterLogin(u.uid, history);
         return;
       }
 
       try {
-        const u = await signInWithGoogleWeb();
+        const u = await timeAsync('Google Sign-In completion (web)', () =>
+          signInWithGoogleWeb()
+        );
         navigateAfterLogin(u.uid, history);
       } catch (err: unknown) {
         if (err instanceof GoogleWebRedirectStarted) {
@@ -145,7 +154,9 @@ export default function LoginPage() {
 
     try {
       await ensureRedirectPersistence();
-      const credential = await signInAnonymously(firebaseAuth);
+      const credential = await timeAsync('Guest sign-in completion', () =>
+        signInAnonymously(firebaseAuth)
+      );
       if (credential.user) {
         navigateAfterLogin(credential.user.uid, history);
       }

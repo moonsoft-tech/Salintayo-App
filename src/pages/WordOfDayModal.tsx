@@ -13,6 +13,7 @@ import {
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { firebaseAuth, firebaseDb } from '../firebase';
 import { speakText, cancelSpeech } from '../utils/tts';
+import { timeAsync } from '../utils/perfLog';
 import { transcribeWhisper } from '../utils/api';
 import { startSpeechToText, type SpeechToTextSession } from '../utils/speechToText';
 import './WordOfDayModal.css';
@@ -429,30 +430,45 @@ const WordOfDayModal: React.FC<Props> = ({
         const dateKey = todayKey();
 
         // 1) Check if the user already completed today's word for this dialect.
-        if (user) {
-          const historySnap = await getDoc(
-            doc(firebaseDb, 'users', user.uid, 'wordOfDayHistory', dateKey)
-          );
-          if (historySnap.exists()) {
-            const data = historySnap.data() as WordOfDayHistoryDoc;
-            if (data.dialect === dialectId) {
-              if (cancelled) return;
-              const entries: WordEntry[] = Array.isArray(data.words)
-                ? data.words
-                : data.word
-                  ? [{ word: data.word, meaning: '' }]
-                  : [];
-              setWordEntries(entries.length > 0 ? entries : []);
-              setSelectedWordIndex(0);
-              setScore(data.score);
-              setStage('already-done');
-              return;
-            }
-          }
-        }
+if (user) {
+  const historySnap = await timeAsync(
+    'Firestore read (Word of the Day history)',
+    () =>
+      getDoc(
+        doc(firebaseDb, 'users', user.uid, 'wordOfDayHistory', dateKey)
+      )
+  );
 
-        // 2) Get today's word set for this dialect from the local dictionary.
-        const picked = await getOrGenerateWordOfDay(dialectId, dialectName);
+  if (historySnap.exists()) {
+    const data = historySnap.data() as WordOfDayHistoryDoc;
+    if (data.dialect === dialectId) {
+      if (cancelled) return;
+
+      const entries: WordEntry[] = Array.isArray(data.words)
+        ? data.words
+        : data.word
+          ? [{ word: data.word, meaning: '' }]
+          : [];
+
+      setWordEntries(entries.length > 0 ? entries : []);
+      setSelectedWordIndex(0);
+      setScore(data.score);
+      setStage('already-done');
+      return;
+    }
+  }
+}
+
+// 2) Get today's word set for this dialect from the local dictionary.
+const picked = await timeAsync(
+  'Word of the Day load',
+  () => getOrGenerateWordOfDay(dialectId, dialectName)
+);
+
+if (cancelled) return;
+setWordEntries(picked);
+setSelectedWordIndex(0);
+setStage('ready');
         if (cancelled) return;
         setWordEntries(picked);
         setSelectedWordIndex(0);
@@ -650,16 +666,20 @@ const WordOfDayModal: React.FC<Props> = ({
     const user = firebaseAuth.currentUser;
     if (!user || !wordEntry || wordEntries.length === 0) return;
     try {
-      await setDoc(
-        doc(firebaseDb, 'users', user.uid, 'wordOfDayHistory', todayKey()),
-        {
-          dialect: dialectId,
-          words: wordEntries,
-          score: finalScore,
-          timestamp: Date.now(),
-        },
-        { merge: true }
-      );
+      await timeAsync(
+  'Firestore write (Word of the Day)',
+  () =>
+    setDoc(
+      doc(firebaseDb, 'users', user.uid, 'wordOfDayHistory', todayKey()),
+      {
+        dialect: dialectId,
+        words: wordEntries,
+        score: finalScore,
+        timestamp: Date.now(),
+      },
+      { merge: true }
+    )
+);
     } catch (e) {
       console.warn('Failed to save Word of the Day attempt:', e);
     }

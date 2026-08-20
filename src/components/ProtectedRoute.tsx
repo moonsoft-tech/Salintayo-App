@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // <--- 1. Import useEffect
 import { Redirect, Route, RouteProps } from 'react-router-dom';
 import { IonPage, IonSpinner } from '@ionic/react';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,8 +10,12 @@ import { logBootStep } from '../bootLogger';
  */
 export default function ProtectedRoute({ children, ...rest }: RouteProps) {
   try {
-    logBootStep('[BOOT 09] ProtectedRoute entered');
     const { user, loading } = useAuth();
+
+    // 2. Move the log inside a useEffect
+    useEffect(() => {
+      logBootStep('[BOOT 09] ProtectedRoute entered');
+    }, []); // <--- Empty array means it ONLY runs ONCE when the component first appears
 
     if (loading) {
       return (

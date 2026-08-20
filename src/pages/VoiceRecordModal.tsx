@@ -12,6 +12,7 @@ import {
 } from 'ionicons/icons';
 import { startSpeechToText, type SpeechToTextSession } from '../utils/speechToText';
 import './VoiceRecordModal.css';
+import { timeAsync } from '../utils/perfLog';
 
 interface VoiceRecordModalProps {
   isOpen: boolean;
@@ -94,8 +95,11 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
   const isStoppingRecognitionRef = useRef(false);
   const discardNextRecordingRef = useRef(false);
   const speechSessionRef = useRef<SpeechToTextSession | null>(null);
-  const stopInFlightRef = useRef(false);
-  const usingNativeSttRef = useRef(false);
+const stopInFlightRef = useRef(false);
+const usingNativeSttRef = useRef(false);
+
+  const speechStartTimeRef = useRef<number | null>(null);
+  const speechFirstResultMeasuredRef = useRef(false);
 
   const webSpeechSupported = (): boolean => {
     const win = window as BrowserSpeechRecognitionWindow;
@@ -182,16 +186,33 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
     finalTranscriptRef.current = '';
     interimTranscriptRef.current = '';
     isStoppingRecognitionRef.current = false;
-    setIsListening(true);
-    setLiveTranscript('');
+setIsListening(true);
+setLiveTranscript('');
 
-    const recognition = new SpeechRecognitionCtor();
+speechStartTimeRef.current = performance.now();
+speechFirstResultMeasuredRef.current = false;
+
+const recognition = new SpeechRecognitionCtor();
     recognition.lang = 'en-US';
     recognition.continuous = true;
     recognition.interimResults = true;
 
-    recognition.onresult = (event: BrowserSpeechRecognitionEvent) => {
-      let interim = '';
+recognition.onresult = (event: BrowserSpeechRecognitionEvent) => {
+  if (
+    !speechFirstResultMeasuredRef.current &&
+    speechStartTimeRef.current !== null
+  ) {
+    const ms = performance.now() - speechStartTimeRef.current;
+
+    speechFirstResultMeasuredRef.current = true;
+    speechStartTimeRef.current = null;
+
+    console.log(
+      `[PERF] Speech-to-text response latency (Web): ${ms.toFixed(1)}ms`
+    );
+  }
+
+  let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const chunk = event.results[i][0]?.transcript ?? '';
         if (event.results[i].isFinal) {
@@ -221,17 +242,17 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
       }
     };
 
-    recognition.onend = () => {
-      if (!isStoppingRecognitionRef.current && voiceState === 'recording') {
-        try {
-          recognition.start();
-        } catch {
-          // ignore
-        }
-      } else {
-        setIsListening(false);
-      }
-    };
+recognition.onend = () => {
+  if (!isStoppingRecognitionRef.current && voiceState === 'recording') {
+    try {
+      recognition.start();
+    } catch {
+      // ignore
+    }
+  } else {
+    setIsListening(false);
+  }
+};
 
     recognitionRef.current = recognition;
     try {
@@ -243,19 +264,22 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
     }
   };
 
-  const stopWebSpeechRecognition = () => {
-    isStoppingRecognitionRef.current = true;
-    setIsListening(false);
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch {
-        // ignore
-      }
-      recognitionRef.current = null;
-    }
-  };
+const stopWebSpeechRecognition = () => {
+  isStoppingRecognitionRef.current = true;
+  setIsListening(false);
 
+  const recognition = recognitionRef.current;
+
+  if (recognition) {
+    try {
+      recognition.stop();
+    } catch {
+      // ignore
+    }
+  }
+
+  recognitionRef.current = null;
+};
   const startRecording = async () => {
     try {
       setRecordingError('');
@@ -382,7 +406,10 @@ const VoiceRecordModal: React.FC<VoiceRecordModalProps> = ({
 
       void (async () => {
         try {
-          const stoppedText = await session?.stop();
+          const stoppedText = await timeAsync(
+  'Speech-to-text latency',
+  () => session?.stop() ?? Promise.resolve('')
+);
           const text = normalizeRepeatedSpeech(
             stoppedText || session?.getTranscript() || snapshot
           );

@@ -9,6 +9,7 @@
 import { Capacitor } from '@capacitor/core';
 import { QueueStrategy, TextToSpeech } from '@capacitor-community/text-to-speech';
 import { logBootStep } from './bootLogger';
+import { timeAsync } from './perfLog';
 import { getResolvedDialectLangCode, QCB_DIALECT_LANG_STORAGE_KEY, DIALECT_LANG_STORAGE_KEY } from './dialectPreference';
 
 type DialectCode = string;
@@ -235,6 +236,7 @@ async function speakNativeText(text: string, locale: string): Promise<void> {
 }
 
 export interface SpeakTextOptions {
+  onStart?: () => void;
   onEnd?: () => void;
   onError?: () => void;
 }
@@ -242,6 +244,18 @@ export interface SpeakTextOptions {
 /** Speaks plain text; cancels any in-flight utterance first. */
 export function speakText(text: string, options?: SpeakTextOptions): void {
   const trimmed = text.trim();
+  const ttsStartTime = performance.now();
+  let ttsMeasured = false;
+
+  const measureTtsStart = () => {
+    if (ttsMeasured) return;
+    ttsMeasured = true;
+
+    const ms = performance.now() - ttsStartTime;
+
+    console.log(`[PERF] TTS start latency: ${ms.toFixed(1)}ms`);
+    options?.onStart?.();
+  };
   if (!trimmed) {
     options?.onEnd?.();
     return;
@@ -306,9 +320,18 @@ export function speakText(text: string, options?: SpeakTextOptions): void {
 
         const audioBlob = new Blob([arrayBuffer], { type: 'audio/wav' });
         cambAudioUrl = URL.createObjectURL(audioBlob);
-        cambAudioEl = new Audio(cambAudioUrl);
+cambAudioEl = new Audio(cambAudioUrl);
 
-        cambAudioEl.onended = () => {
+let cambStartMeasured = false;
+
+cambAudioEl.onplay = () => {
+  if (!cambStartMeasured) {
+    cambStartMeasured = true;
+    measureTtsStart();
+  }
+};
+
+cambAudioEl.onended = () => {
           if (cambAudioUrl) URL.revokeObjectURL(cambAudioUrl);
           cambAudioUrl = null;
           cambAudioEl = null;
@@ -351,11 +374,16 @@ export function speakText(text: string, options?: SpeakTextOptions): void {
           }
           await waitForVoices();
           window.speechSynthesis.cancel();
-          const utter = new SpeechSynthesisUtterance(trimmed);
-          utter.lang = locale;
-          utter.rate = 0.92;
-          utter.pitch = 1;
-          utter.onend = () => options?.onEnd?.();
+const utter = new SpeechSynthesisUtterance(trimmed);
+utter.lang = locale;
+utter.rate = 0.92;
+utter.pitch = 1;
+
+utter.onstart = () => {
+  measureTtsStart();
+};
+
+utter.onend = () => options?.onEnd?.();
           utter.onerror = () => options?.onError?.();
           window.speechSynthesis.speak(utter);
         } catch (err) {
