@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.transcribeWhisper = exports.resetPasswordWithCode = exports.verifyPasswordResetCode = exports.sendPasswordResetCode = exports.markUserRegistered = exports.chatCompletion = exports.validateUserAction = exports.getMe = void 0;
+exports.edgeTts = exports.transcribeWhisper = exports.resetPasswordWithCode = exports.verifyPasswordResetCode = exports.sendPasswordResetCode = exports.markUserRegistered = exports.chatCompletion = exports.validateUserAction = exports.getMe = void 0;
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
+const node_edge_tts_1 = require("node-edge-tts");
 const cors = require('cors');
 admin.initializeApp();
 const corsHandler = cors({ origin: true });
@@ -561,6 +562,81 @@ exports.transcribeWhisper = functions.https.onRequest((req, res) => {
             res.status(502).json({
                 error: 'Whisper service unavailable',
                 message: e instanceof Error ? e.message : 'Unknown error',
+            });
+        }
+    });
+});
+/**
+ * edgeTts — Generates Filipino male speech using
+ * Microsoft Edge's online TTS voice:
+ * fil-PH-AngeloNeural
+ *
+ * Frontend sends:
+ * {
+ *   text: "Kumusta ka?"
+ * }
+ *
+ * Returns:
+ *   audio/mpeg
+ */
+exports.edgeTts = functions.https.onRequest((req, res) => {
+    corsHandler(req, res, async () => {
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+        res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+        if (req.method === 'OPTIONS') {
+            res.status(204).send('');
+            return;
+        }
+        if (req.method !== 'POST') {
+            res.status(405).json({
+                error: 'Method not allowed',
+            });
+            return;
+        }
+        try {
+            const body = req.body;
+            const text = ((body === null || body === void 0 ? void 0 : body.text) || '').toString().trim();
+            if (!text) {
+                res.status(400).json({
+                    error: 'Bad request',
+                    message: 'text is required',
+                });
+                return;
+            }
+            // Prevent unnecessarily large TTS requests.
+            if (text.length > 5000) {
+                res.status(413).json({
+                    error: 'Payload too large',
+                    message: 'Text is too long for TTS.',
+                });
+                return;
+            }
+            const path = require('path');
+            const os = require('os');
+            const outputPath = path.join(os.tmpdir(), `salintayo-angelo-${Date.now()}.mp3`);
+            const tts = new node_edge_tts_1.EdgeTTS({
+                voice: 'fil-PH-AngeloNeural',
+                lang: 'fil-PH',
+                outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
+            });
+            await tts.ttsPromise(text, outputPath);
+            const audioBuffer = require('fs').readFileSync(outputPath);
+            require('fs').unlinkSync(outputPath);
+            if (!audioBuffer || audioBuffer.length === 0) {
+                throw new Error('Edge TTS returned empty audio.');
+            }
+            res.set('Content-Type', 'audio/mpeg');
+            res.set('Cache-Control', 'no-store');
+            res.status(200).send(audioBuffer);
+        }
+        catch (e) {
+            functions.logger.error('edgeTts failed', e);
+            res.status(500).json({
+                error: 'Edge TTS failed',
+                message: e instanceof Error
+                    ? e.message
+                    : 'Unknown error',
             });
         }
     });

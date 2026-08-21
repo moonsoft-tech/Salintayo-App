@@ -27,6 +27,12 @@ import LanguageModal, { Language, LANGUAGES } from './LanguageModal';
 import { getDefaultDialectCodeForExperience, getResolvedDialectLangCode } from '../utils/dialectPreference';
 import HelpModal from './HelpModal';
 import LogoutModal from './LogoutModal';
+import {
+  getSelectedTtsVoice,
+  getTtsVoiceLabel,
+  setSelectedTtsVoice,
+  type TtsVoiceId,
+} from '../utils/tts';
 
 // Firebase
 import { signOut } from 'firebase/auth';
@@ -71,9 +77,23 @@ const ProfilePage: React.FC = () => {
   });
 
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
-  const [showLanguageModal, setShowLanguageModal]     = useState(false);
-  const [showHelpModal, setShowHelpModal]             = useState(false);
-  const [showLogoutModal, setShowLogoutModal]         = useState(false);
+const [showLanguageModal, setShowLanguageModal]     = useState(false);
+const [showHelpModal, setShowHelpModal]             = useState(false);
+const [showLogoutModal, setShowLogoutModal]         = useState(false);
+
+const [selectedTtsVoice, setSelectedTtsVoiceState] = useState<TtsVoiceId>(
+  getSelectedTtsVoice()
+);
+
+const changeTtsVoice = () => {
+  const nextVoice: TtsVoiceId =
+    selectedTtsVoice === 'camb-female'
+      ? 'angelo-male'
+      : 'camb-female';
+
+  setSelectedTtsVoiceState(nextVoice);
+  setSelectedTtsVoice(nextVoice);
+};
 
   // Quick Chat Bubble toggle
   const QCB_KEY = 'salintayo_quickchat_enabled';
@@ -551,6 +571,55 @@ const ProfilePage: React.FC = () => {
                   <span className="settings-chevron">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="9 18 15 12 9 6"/>
+                    </svg>
+                  </span>
+                </button>
+                            </li>
+
+              <li>
+                <button
+                  className="settings-item"
+                  onClick={changeTtsVoice}
+                  type="button"
+                  aria-label={`Change AI Voice. Current voice: ${getTtsVoiceLabel(selectedTtsVoice)}`}
+                >
+                  <div className="settings-item-left">
+                    <span className="settings-item-icon teal">
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                      </svg>
+                    </span>
+
+                    <div className="settings-item-label-group">
+                      <span className="settings-item-label">
+                        AI Voice
+                      </span>
+
+                      <span className="settings-item-sublabel">
+                        {getTtsVoiceLabel(selectedTtsVoice)} · Tap to change
+                      </span>
+                    </div>
+                  </div>
+
+                  <span className="settings-chevron">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="9 18 15 12 9 6" />
                     </svg>
                   </span>
                 </button>

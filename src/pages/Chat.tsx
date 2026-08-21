@@ -55,6 +55,7 @@ import { speakText, cancelSpeech } from '../utils/tts';
 import { getResolvedDialectLangCode, getDefaultDialectCodeForExperience } from '../utils/dialectPreference';
 import { getOpenRouterHttpReferer } from '../utils/openRouterClient';
 import { callProtectedApi, transcribeWhisper } from '../utils/api';
+import { censorProfanity } from '../utils/profanityFilter';
 import { timeAsync } from '../utils/perfLog';
 
 // Type definitions for Emergency Mode (from EmergencyDialectBubble)
@@ -1211,7 +1212,9 @@ const ChatPage: React.FC = () => {
     if (lastMsg.role !== 'ai') return;
 
     // Speak via shared TTS wrapper (now prefers Camb, with fallbacks).
-    const textToSpeak = getTtsSpeakTextFromAiMessageContent(lastMsg.content);
+    const textToSpeak = censorProfanity(
+  getTtsSpeakTextFromAiMessageContent(lastMsg.content)
+);
     if (!textToSpeak.trim()) {
       const t = setTimeout(() => setIsVoiceModalOpen(true), 800);
       return () => clearTimeout(t);
@@ -1350,10 +1353,20 @@ Always respond primarily in ${lang.label} when the user communicates in English.
     }
 
     setSpeakingTtsMessageId(msg.id);
-    speakText(getTtsSpeakTextFromAiMessageContent(msg.content), {
-      onEnd: () => setSpeakingTtsMessageId((id) => (id === msg.id ? null : id)),
-      onError: () => setSpeakingTtsMessageId((id) => (id === msg.id ? null : id)),
-    });
+
+const speechText = censorProfanity(
+  getTtsSpeakTextFromAiMessageContent(msg.content)
+);
+
+if (!speechText.trim()) {
+  setSpeakingTtsMessageId(null);
+  return;
+}
+
+speakText(speechText, {
+  onEnd: () => setSpeakingTtsMessageId((id) => (id === msg.id ? null : id)),
+  onError: () => setSpeakingTtsMessageId((id) => (id === msg.id ? null : id)),
+});
   }, [speakingTtsMessageId]);
 
   const handleCopyMessage = useCallback(async (msg: ChatMessage) => {
@@ -1468,11 +1481,11 @@ const reply = await timeAsync('Chat AI response', () =>
       const content = await generateAiReply(text, messages, { forceTranslation: options?.forceTranslation });
 
       const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'ai',
-        content: content || 'Sorry, I could not generate a response. Please try again.',
-        timestamp: formatTime(),
-      };
+  id: (Date.now() + 1).toString(),
+  role: 'ai',
+  content: censorProfanity(content) || 'Sorry, I could not generate a response. Please try again.',
+  timestamp: formatTime(),
+};
       setMessages((prev) => [...prev, aiMessage]);
       if (user?.uid) persistCloudMessage(aiMessage);
     } catch (e) {
@@ -1874,7 +1887,9 @@ Rules:
         ocrTranslationPrompt,
         { maxTokens: 1000, temperature: 0.2, reasoningEnabled: false }
       );
-      const translationOnly = extractTranslationOnly(translatedText, false);
+      const translationOnly = censorProfanity(
+  extractTranslationOnly(translatedText, false)
+);
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1000).toString(),
@@ -1907,8 +1922,8 @@ Rules:
     const hasPlayableAudio = audioBlob.size > 0;
     const audioUrl = hasPlayableAudio ? URL.createObjectURL(audioBlob) : undefined;
     const messageId = Date.now().toString();
-    const trimmedTranscript = transcript.trim();
-    const voiceBubbleText = caption.trim() || trimmedTranscript;
+    const trimmedTranscript = censorProfanity(transcript.trim());
+  const voiceBubbleText = censorProfanity(caption.trim()) || trimmedTranscript;
 
     const voiceUserMessage: ChatMessage = {
       id: messageId,
@@ -1929,7 +1944,7 @@ Rules:
       let sourceText = trimmedTranscript;
       if (!sourceText && hasPlayableAudio) {
         const t = await transcribeWhisper(audioBlob);
-        sourceText = (t.text || '').trim();
+        sourceText = censorProfanity((t.text || '').trim());
       }
 
       if (!sourceText) {
@@ -1953,7 +1968,9 @@ Rules:
         voicePrompt,
         { maxTokens: translationMaxOutputTokens(sourceText, false), temperature: 0.1, reasoningEnabled: false }
       );
-      const translationOnly = extractTranslationOnly(translated, false) || '[Translation unavailable]';
+      const translationOnly =
+  censorProfanity(extractTranslationOnly(translated, false)) ||
+  '[Translation unavailable]';
 
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
